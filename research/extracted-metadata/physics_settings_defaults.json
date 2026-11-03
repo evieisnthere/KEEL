@@ -1,0 +1,216 @@
+{
+ "source": "stormworks64.exe (PE timestamp 2026-10-29 10:01:45 UTC), function 0x140295db0",
+ "evidence": "E1 - default values passed to named-float serializer 0x1408f3a70; may be overridden by data at runtime (unverified)",
+ "fields": [
+  {
+   "name": "gravity",
+   "offset": "0x0",
+   "default": 10.0
+  },
+  {
+   "name": "air_drag_factor_linear_pressure",
+   "offset": "4",
+   "default": 0.05
+  },
+  {
+   "name": "air_drag_factor_quadratic_pressure",
+   "offset": "8",
+   "default": 0.1
+  },
+  {
+   "name": "air_drag_factor_linear_suction",
+   "offset": "0xc",
+   "default": 0.025
+  },
+  {
+   "name": "air_drag_factor_quadratic_suction",
+   "offset": "0x10",
+   "default": 0.05
+  },
+  {
+   "name": "air_falloff_power_pressure",
+   "offset": "0x14",
+   "default": 0.6
+  },
+  {
+   "name": "air_falloff_power_suction",
+   "offset": "0x18",
+   "default": 0.4
+  },
+  {
+   "name": "drag_factor_linear_pressure",
+   "offset": "0x1c",
+   "default": 15.0
+  },
+  {
+   "name": "drag_factor_quadratic_pressure",
+   "offset": "0x20",
+   "default": 17.0
+  },
+  {
+   "name": "drag_factor_linear_suction",
+   "offset": "0x24",
+   "default": 12.0
+  },
+  {
+   "name": "drag_factor_quadratic_suction",
+   "offset": "0x28",
+   "default": 5.0
+  },
+  {
+   "name": "falloff_power_pressure",
+   "offset": "0x2c",
+   "default": 2.5
+  },
+  {
+   "name": "falloff_power_suction",
+   "offset": "0x30",
+   "default": 0.3
+  },
+  {
+   "name": "water_drag_factor",
+   "offset": "0x34",
+   "default": 1.0
+  },
+  {
+   "name": "air_drag_factor",
+   "offset": "0x38",
+   "default": 0.2
+  },
+  {
+   "name": "air_speed_threshold",
+   "offset": "0x3c",
+   "default": 15.0
+  },
+  {
+   "name": "air_high_speed_threshold",
+   "offset": "0x40",
+   "default": 50.0
+  },
+  {
+   "name": "air_high_speed_factor_scale",
+   "offset": "0x44",
+   "default": 8.0
+  },
+  {
+   "name": "buoyancy_mass_multiplier",
+   "offset": "0x48",
+   "default": 10.0
+  },
+  {
+   "name": "buoyancy_mass_modifier",
+   "offset": "0x4c",
+   "default": 10.0
+  },
+  {
+   "name": "buoyancy_mass_modifier_lower",
+   "offset": "0x50",
+   "default": 2000.0
+  },
+  {
+   "name": "buoyancy_mass_modifier_upper",
+   "offset": "0x54",
+   "default": 23000.0
+  },
+  {
+   "name": "buoyancy_mass_modifier_pow",
+   "offset": "0x58",
+   "default": 1.0
+  },
+  {
+   "name": "vehicle_linear_damping",
+   "offset": "0x5c",
+   "default": 0.1
+  },
+  {
+   "name": "vehicle_angular_damping",
+   "offset": "0x60",
+   "default": 0.1
+  },
+  {
+   "name": "vehicle_friction",
+   "offset": "0x64",
+   "default": 0.8
+  },
+  {
+   "name": "air_density",
+   "offset": "0x68",
+   "default": 1.225
+  },
+  {
+   "name": "water_density",
+   "offset": "0x6c",
+   "default": 1000.0
+  },
+  {
+   "name": "water_compartment_force_factor",
+   "offset": "0x70",
+   "default": 1.0
+  },
+  {
+   "name": "gas_compartment_force_factor",
+   "offset": "0x74",
+   "default": 1.0
+  },
+  {
+   "name": "water_drag_weight_factor_multiplier",
+   "offset": "0x78",
+   "default": 4.0
+  },
+  {
+   "name": "wave_velocity_factor",
+   "offset": "0x7c",
+   "default": 0.5
+  },
+  {
+   "name": "wave_velocity_factor_reverse",
+   "offset": "0x80",
+   "default": 0.3
+  },
+  {
+   "name": "viscous_resistance_factor",
+   "offset": "0x84",
+   "default": 0.5
+  },
+  {
+   "name": "slamming_force_multiplier",
+   "offset": "0x88",
+   "default": 100.0
+  },
+  {
+   "name": "viscous_air_resistance",
+   "offset": "0x8c",
+   "default": 0.25
+  },
+  {
+   "name": "lift_force",
+   "offset": "0x90",
+   "default": 0.25
+  },
+  {
+   "name": "buoyancy_damping",
+   "offset": "0x94",
+   "default": 0.05
+  },
+  {
+   "name": "buoyancy_damping_submerged",
+   "offset": "0x98",
+   "default": 0.92
+  },
+  {
+   "name": "sonar_noise",
+   "offset": "0x9c",
+   "default": 0.001
+  },
+  {
+   "name": "radar_noise",
+   "offset": "0xa0",
+   "default": 0.001
+  },
+  {
+   "name": "radar_distance_noise",
+   "offset": "0xa4",
+   "default": 0.01
+  }
+ ]
+}

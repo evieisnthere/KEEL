@@ -1,0 +1,5 @@
+research/binaries/*.exe
+research/binaries/*.tar.gz
+*.pkl
+__pycache__/
+research/extracted-metadata/definitions_catalogue.json

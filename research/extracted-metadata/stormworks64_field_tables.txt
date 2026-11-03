@@ -1,0 +1,1373 @@
+## func 0x140190dc0  (1 fields)
+  f32  x                                        r15            ?
+## func 0x140190f4b  (2 fields)
+  f32  x                                        r15            ?
+  f32  y                                        r15 + 4        ?
+## func 0x14019116d  (2 fields)
+  B    x                                        r12            ?
+  B    y                                        r12 + 4        ?
+## func 0x1401911f0  (2 fields)
+  f32  x                                        r15            ?
+  f32  y                                        rdi            ?
+## func 0x1401913ab  (3 fields)
+  f32  x                                        r15            ?
+  f32  y                                        r15 + 4        ?
+  f32  z                                        r15 + 8        ?
+## func 0x14019183d  (4 fields)
+  f32  x                                        r13            ?
+  f32  y                                        r13 + 4        ?
+  f32  z                                        r13 + 8        ?
+  f32  w                                        r13 + 0xc      ?
+## func 0x140191a8d  (3 fields)
+  B    x                                        r15            ?
+  B    y                                        r15 + 4        ?
+  B    z                                        r15 + 8        ?
+## func 0x140191b30  (7 fields)
+  f32  x                                        r15            ?
+  f32  y                                        rdi            ?
+  f32  z                                        rsi            ?
+  f32  x                                        r15            ?
+  f32  y                                        r15 + 4        ?
+  f32  z                                        r15 + 8        ?
+  f32  w                                        r15 + 0xc      ?
+## func 0x1401921dd  (16 fields)
+  f32  00                                       rdi            ?
+  f32  01                                       rdi + 4        ?
+  f32  02                                       rdi + 8        ?
+  f32  03                                       rdi + 0xc      ?
+  f32  10                                       rdi + 0x10     ?
+  f32  11                                       rdi + 0x14     ?
+  f32  12                                       rdi + 0x18     ?
+  f32  13                                       rdi + 0x1c     ?
+  f32  20                                       rdi + 0x20     ?
+  f32  21                                       rdi + 0x24     ?
+  f32  22                                       rdi + 0x28     ?
+  f32  23                                       rdi + 0x2c     ?
+  f32  30                                       rdi + 0x30     ?
+  f32  31                                       rdi + 0x34     ?
+  f32  32                                       rdi + 0x38     ?
+  f32  33                                       rdi + 0x3c     ?
+## func 0x14019299d  (9 fields)
+  B    00                                       r15            ?
+  B    01                                       r15 + 4        ?
+  B    02                                       r15 + 8        ?
+  B    10                                       r15 + 0xc      ?
+  B    11                                       r15 + 0x10     ?
+  B    12                                       r15 + 0x14     ?
+  B    20                                       r15 + 0x18     ?
+  B    21                                       r15 + 0x1c     ?
+  B    22                                       r15 + 0x20     ?
+## func 0x1401d13d0  (4 fields)
+  f32  l                                        rbp + 0x10     0.0
+  f32  r                                        rbp + 0x14     0.0
+  f32  b                                        rbp + 0x18     0.0
+  f32  t                                        rbp + 0x1c     0.0
+## func 0x1401d15c0  (2 fields)
+  A    width                                    rsi + 0x10     ?
+  A    height                                   rsi + 0x14     ?
+## func 0x14020c510  (2 fields)
+  D    name                                     rsi            ?
+  D    author                                   rsi + 0x10     ?
+## func 0x1402119b0  (3 fields)
+  D    name                                     rsi            ?
+  D    author                                   rsi + 0x10     ?
+  D    desc                                     rsi + 0x20     ?
+## func 0x14021b3b0  (2 fields)
+  A    vehicle_id                               rdi            ?
+  A    body_index                               rdi + 4        ?
+## func 0x14021b5c0  (1 fields)
+  A    scene_object_id                          rdi            0
+## func 0x14026b650  (1 fields)
+  A    character_active_item_index              rbx            0
+## func 0x140277b50  (2 fields)
+  A    camera_mode                              rbp + 8        ?
+  A    paint_mode                               rbp + 0xc      ?
+## func 0x1402782f0  (17 fields)
+  A    flags                                    rcx            None
+  f32  mouse_sensitivity                        rbx + 0x2c     0.0
+  f32  mouse_aspect                             rbx + 0x30     1.0
+  f32  volume_master                            rbx + 0x14     0.0
+  f32  volume_sounds                            rbx + 0x18     0.0
+  f32  volume_environment                       rbx + 0x1c     0.0
+  f32  volume_music                             rbx + 0x20     0.0
+  f32  volume_voice                             rbx + 0x24     1.0
+  A    data_version                             rbx + 0x48     ?
+  A    hud_pinned_data_labels                   rbx + 8        1
+  A    fov_first_person                         rbx + 0x34     70
+  A    fov_first_person_vehicle                 rbx + 0x38     70
+  A    fov_third_person                         rbx + 0x3c     70
+  A    editor_autosave_slot_vehicle             rbx + 0x154    ?
+  A    editor_autosave_slot_microprocessor      rbx + 0x158    ?
+  f32  physics_timestep                         rbx + 0x40     0.0
+  B    language_file_store                      rbx + 0x170    1
+## func 0x14027a140  (13 fields)
+  A    flags                                    rcx            126
+  B    ssao_quality                             r15 + 0xc      2
+  B    shadow_quality                           r15 + 4        4
+  B    shadow_resolution                        r15 + 8        3
+  B    light_volume_quality                     r15 + 0x10     2
+  B    tree_quality                             r15 + 0x14     2
+  B    monitor_quality                          r15 + 0x18     2
+  A    view_distance                            r15 + 0x1c     8000
+  A    camera_shake                             r15 + 0x20     100
+  A    resolution_x                             r15 + 0x2c     ?
+  A    resolution_y                             r15 + 0x30     ?
+  A    version                                  r15 + 0x44     ?
+  A    write_key                                r15 + 0x48     ?
+## func 0x14028f850  (5 fields)
+  f32  sfx_gain                                 r14 + 0x48     1.0
+  f32  sfx_loop_start_time                      r14 + 0x4c     0.75
+  f32  sfx_loop_blend_duration                  r14 + 0x50     10.0
+  f32  sfx_volume_fade_speed                    r14 + 0x54     1.0
+  f32  sfx_pitch_fade_speed                     r14 + 0x58     1.0
+## func 0x14028fa80  (3 fields)
+  f32  sfx_range_inner                          rbp + 0x10     1.0
+  f32  sfx_range_outer                          rbp + 0x14     10.0
+  f32  sfx_priority                             rbp + 0x18     0.5
+## func 0x140292850  (3 fields)
+  B    x                                        rdi            0
+  B    y                                        rdi + 4        0
+  B    z                                        rdi + 8        0
+## func 0x1402947f0  (1 fields)
+  A    starting_currency                        rdi + 0xc      20000
+## func 0x1402950d0  (3 fields)
+  A    day_length                               rdi            30
+  A    night_length                             rdi + 4        30
+  D    base_island                              rdi + 0x10     ?
+## func 0x140295db0  (42 fields)
+  f32  gravity                                  rcx            None
+  f32  air_drag_factor_linear_pressure          rbx + 4        0.05
+  f32  air_drag_factor_quadratic_pressure       rbx + 8        0.1
+  f32  air_drag_factor_linear_suction           rbx + 0xc      0.025
+  f32  air_drag_factor_quadratic_suction        rbx + 0x10     0.05
+  f32  air_falloff_power_pressure               rbx + 0x14     0.6
+  f32  air_falloff_power_suction                rbx + 0x18     0.4
+  f32  drag_factor_linear_pressure              rbx + 0x1c     15.0
+  f32  drag_factor_quadratic_pressure           rbx + 0x20     17.0
+  f32  drag_factor_linear_suction               rbx + 0x24     12.0
+  f32  drag_factor_quadratic_suction            rbx + 0x28     5.0
+  f32  falloff_power_pressure                   rbx + 0x2c     2.5
+  f32  falloff_power_suction                    rbx + 0x30     0.3
+  f32  water_drag_factor                        rbx + 0x34     1.0
+  f32  air_drag_factor                          rbx + 0x38     0.2
+  f32  air_speed_threshold                      rbx + 0x3c     15.0
+  f32  air_high_speed_threshold                 rbx + 0x40     50.0
+  f32  air_high_speed_factor_scale              rbx + 0x44     8.0
+  f32  buoyancy_mass_multiplier                 rbx + 0x48     10.0
+  f32  buoyancy_mass_modifier                   rbx + 0x4c     10.0
+  f32  buoyancy_mass_modifier_lower             rbx + 0x50     2000.0
+  f32  buoyancy_mass_modifier_upper             rbx + 0x54     23000.0
+  f32  buoyancy_mass_modifier_pow               rbx + 0x58     1.0
+  f32  vehicle_linear_damping                   rbx + 0x5c     0.1
+  f32  vehicle_angular_damping                  rbx + 0x60     0.1
+  f32  vehicle_friction                         rbx + 0x64     0.8
+  f32  air_density                              rbx + 0x68     1.225
+  f32  water_density                            rbx + 0x6c     1000.0
+  f32  water_compartment_force_factor           rbx + 0x70     1.0
+  f32  gas_compartment_force_factor             rbx + 0x74     1.0
+  f32  water_drag_weight_factor_multiplier      rbx + 0x78     4.0
+  f32  wave_velocity_factor                     rbx + 0x7c     0.5
+  f32  wave_velocity_factor_reverse             rbx + 0x80     0.3
+  f32  viscous_resistance_factor                rbx + 0x84     0.5
+  f32  slamming_force_multiplier                rbx + 0x88     100.0
+  f32  viscous_air_resistance                   rbx + 0x8c     0.25
+  f32  lift_force                               rbx + 0x90     0.25
+  f32  buoyancy_damping                         rbx + 0x94     0.05
+  f32  buoyancy_damping_submerged               rbx + 0x98     0.92
+  f32  sonar_noise                              rbx + 0x9c     0.001
+  f32  radar_noise                              rbx + 0xa0     0.001
+  f32  radar_distance_noise                     rbx + 0xa4     0.01
+## func 0x140297840  (9 fields)
+  A    day_tick                                 rdi + 0xa4     ?
+  A    day                                      rdi + 0xa8     ?
+  A    month                                    rdi + 0xac     ?
+  A    year                                     rdi + 0xb0     ?
+  A    weather                                  rdi + 0xb4     ?
+  D    rogue_mode_save                          rdi + 0x140    ?
+  A    total_playtime                           rdi + 0xb8     ?
+  B    currency                                 rdi + 0x120    ?
+  B    research_points                          rdi + 0x124    5
+## func 0x1402a7160  (1 fields)
+  A    seasonal_flags                           rdi + 0x1ec    ?
+## func 0x1402a7400  (4 fields)
+  D    id                                       rdi + 0x110    ?
+  D    parent_id                                rdi + 0x128    ?
+  D    purchase_interactable_id                 rdi + 0x1d8    ?
+  A    seasonal_flags                           rdi + 0x1ec    ?
+## func 0x1402a8420  (1 fields)
+  f32  additive_factor                          r14 + 0x21c    1.0
+## func 0x1402a8590  (2 fields)
+  D    file_name                                r14 + 0x200    ?
+  f32  additive_factor                          r14 + 0x21c    0.0
+## func 0x1402a9680  (1 fields)
+  D    file_name                                rsi + 0x210    ?
+## func 0x1402a9f70  (1 fields)
+  D    file_name                                rsi + 0x210    ?
+## func 0x1402abfe0  (1 fields)
+  f32  mass                                     rsi + 0x214    0.0
+## func 0x1402acba0  (1 fields)
+  f32  radius                                   rsi + 0x224    0.0
+## func 0x1402ad7b0  (2 fields)
+  f32  range                                    rbx + 0x20c    0.0
+  f32  fov                                      rbx + 0x210    0.0
+## func 0x1402ad8e0  (3 fields)
+  f32  range                                    rdi + 0x20c    0.0
+  f32  fov                                      rdi + 0x210    0.0
+  D    texture                                  rdi + 0x218    ?
+## func 0x1402ae270  (2 fields)
+  f32  length                                   rdi + 0x20c    0.0
+  f32  radius                                   rdi + 0x210    0.0
+## func 0x1402ae9f0  (1 fields)
+  A    spawned_static_vehicle_id                rbx + 0x220    ?
+## func 0x1402aeb50  (2 fields)
+  D    default_vehicle                          rdi + 0x210    ?
+  A    spawned_static_vehicle_id                rdi + 0x220    ?
+## func 0x1402b0150  (4 fields)
+  f32  width                                    rbx + 0x238    0.0
+  f32  height                                   rbx + 0x23c    0.0
+  A    resolution_x                             rbx + 0x230    0
+  A    resolution_y                             rbx + 0x234    0
+## func 0x1402b0260  (4 fields)
+  f32  width                                    rdi + 0x238    0.0
+  f32  height                                   rdi + 0x23c    0.0
+  A    resolution_x                             rdi + 0x230    0
+  A    resolution_y                             rdi + 0x234    0
+## func 0x1402b0d80  (5 fields)
+  A    pos_index                                rsi + 0x2a0    ?
+  f32  pos_factor                               rsi + 0x2a4    0.0
+  A    anim_duration                            rsi + 0x2a8    ?
+  A    anim_delay                               rsi + 0x2ac    ?
+  A    anim_delay_back                          rsi + 0x2b0    ?
+## func 0x1402b1040  (9 fields)
+  D    target_a                                 rsi + 0x200    ?
+  D    target_b                                 rsi + 0x210    ?
+  D    target_movable                           rsi + 0x220    ?
+  D    target_triggered                         rsi + 0x230    ?
+  A    pos_index                                rsi + 0x2a0    ?
+  f32  pos_factor                               rsi + 0x2a4    0.0
+  A    anim_duration                            rsi + 0x2a8    ?
+  A    anim_delay                               rsi + 0x2ac    ?
+  A    anim_delay_back                          rsi + 0x2b0    ?
+## func 0x1402b2850  (3 fields)
+  A    flicker_duration                         rbp + 0x21c    ?
+  A    flash_on_duration                        rbp + 0x220    ?
+  A    flash_off_duration                       rbp + 0x224    ?
+## func 0x1402b29a0  (4 fields)
+  D    target                                   rdi + 0x200    ?
+  A    flicker_duration                         rdi + 0x21c    ?
+  A    flash_on_duration                        rdi + 0x220    ?
+  A    flash_off_duration                       rdi + 0x224    ?
+## func 0x1402b35d0  (1 fields)
+  D    target                                   rdi + 0x200    ?
+## func 0x1402b40a0  (2 fields)
+  A    trigger_on_delay                         rdi + 0x2c4    ?
+  A    cooldown_time                            rdi + 0x2cc    ?
+## func 0x1402b4320  (2 fields)
+  A    trigger_on_delay                         r14 + 0x2c4    ?
+  A    cooldown_time                            r14 + 0x2cc    ?
+## func 0x1402b5600  (4 fields)
+  f32  range_inner                              r14 + 0x200    0.0
+  f32  range_outer                              r14 + 0x204    0.0
+  f32  audio_gain                               r14 + 0x208    0.0
+  A    play_duration                            r14 + 0x20c    ?
+## func 0x1402b5830  (7 fields)
+  D    start_filename                           rdi + 0x218    ?
+  D    loop_filename                            rdi + 0x228    ?
+  D    end_filename                             rdi + 0x238    ?
+  f32  range_inner                              rdi + 0x200    0.0
+  f32  range_outer                              rdi + 0x204    0.0
+  f32  audio_gain                               rdi + 0x208    0.0
+  A    play_duration                            rdi + 0x20c    ?
+## func 0x1402b68c0  (1 fields)
+  D    string_data                              r14 + 0x218    ?
+## func 0x1402bca60  (7 fields)
+  f32  tsunami_magnitude                        rdi + 0xb3bc4  0.0
+  f32  tsunami_scale                            rdi + 0xb3bc8  1.0
+  f32  tsunami_offset                           rdi + 0xb3bcc  0.0
+  A    tsunami_lifetime                         rdi + 0xb3bd0  ?
+  A    tsunami_state                            rdi + 0xb3bd4  2
+  A    tsunami_base_time                        rdi + 0xb3bd8  ?
+  A    ocean_time                               rdi + 0x7f8b4  ?
+## func 0x1402bf5d0  (5 fields)
+  f32  base_radius_inner                        rdi + 0x30     0.0
+  f32  base_radius_outer                        rdi + 0x34     0.0
+  f32  active_factor                            rdi + 0x3c     0.0
+  f32  lifespan                                 rdi + 0x40     0.0
+  f32  intensity                                rdi + 0x44     0.0
+## func 0x1402c3160  (4 fields)
+  f32  override_fog_factor                      rcx + 0x94     0.0
+  f32  override_rain_factor                     rdi + 0x9c     0.0
+  f32  override_wind_factor                     rdi + 0xa4     0.0
+  f32  override_wind_dir                        rdi + 0xa8     0.0
+## func 0x1402de5e0  (2 fields)
+  D    text                                     rdi            ?
+  f32  value                                    rdi + 0x10     0.0
+## func 0x1402e4400  (4 fields)
+  B    orientation                              rdi + 0x2c     ?
+  D    label                                    rdi            ?
+  D    description                              rdi + 0x10     ?
+  A    flags                                    rdi + 0x38     ?
+## func 0x1402e4730  (2 fields)
+  B    orientation                              rsi + 0x2c     ?
+  A    flags                                    rsi + 0x38     ?
+## func 0x1402e50c0  (1 fields)
+  A    bools                                    rbx            0
+## func 0x1402e5200  (1 fields)
+  A    bools                                    rcx            0
+## func 0x1402ec5e0  (1 fields)
+  A    editor_connected                         rcx + 8        0
+## func 0x1402ec710  (1 fields)
+  A    editor_connected                         rcx + 8        0
+## func 0x1402ec7a0  (2 fields)
+  A    editor_connected                         rcx + 8        0
+  f32  value                                    rdi + 0x18     0.0
+## func 0x1402ec8b0  (2 fields)
+  A    editor_connected                         rcx + 8        0
+  f32  value                                    rbx + 0x18     0.0
+## func 0x1402ecc20  (1 fields)
+  A    editor_connected                         rcx + 8        0
+## func 0x1402eccd0  (1 fields)
+  A    editor_connected                         rcx + 8        0
+## func 0x1402ecf90  (1 fields)
+  A    editor_connected                         r8             0
+## func 0x1402ed030  (1 fields)
+  A    editor_connected                         rcx + 8        0
+## func 0x1402edc60  (3 fields)
+  f32  vol_total                                rcx + 0x40     0.0
+  f32  temp                                     r14 + 0x44     0.0
+  f32  rad                                      r14 + 0x48     0.0
+## func 0x1402ee7b0  (3 fields)
+  A    editor_connected                         rcx + 8        0
+  f32  demand                                   rdi + 0x28     0.0
+  f32  flow                                     rdi + 0x2c     0.0
+## func 0x1402f0b90  (1 fields)
+  f32  rps                                      r8             0.0
+## func 0x1402f0c50  (6 fields)
+  A    editor_connected                         rcx + 8        0
+  f32  mass                                     rdi + 0x28     0.0
+  f32  demand                                   rdi + 0x2c     0.0
+  f32  flow                                     rdi + 0x30     0.0
+  f32  factor                                   rdi + 0x40     1.0
+  f32  ratio                                    rdi + 0x44     1.0
+## func 0x1402f0fb0  (4 fields)
+  A    editor_connected                         rcx + 8        0
+  A    emp                                      rdi + 0x28     0
+  f32  p_charge                                 rdi + 0x40     0.0
+  f32  p_capacity                               rdi + 0x44     0.0
+## func 0x1402f12e0  (1 fields)
+  A    editor_connected                         r8             0
+## func 0x1402f8b30  (1 fields)
+  B    orientation                              rsi + 0xc      ?
+## func 0x1402fa260  (2 fields)
+  B    orientation                              rbx + 0xc      ?
+  B    alignment                                rbx + 0x10     ?
+## func 0x140304c40  (8 fields)
+  f32  lifetime                                 rcx + 0x58     None
+  f32  lifetime_variation                       rbx + 0x5c     0.0
+  f32  spawn_magnitude                          rbx + 0x14     1.0
+  f32  velocity_damping                         rbx + 0x18     1.0
+  f32  wind_factor                              rbx + 0x1c     1.0
+  f32  scale_start                              rbx + 0x44     0.0
+  f32  scale_end                                rbx + 0x48     1.0
+  f32  strip_threshold                          rbx + 0x64     1.0
+## func 0x14030e7e0  (2 fields)
+  A    vehicle_global_id                        rdi            ?
+  A    body_id                                  rdi + 4        ?
+## func 0x14030eb40  (2 fields)
+  f32  radius                                   rdi + 0x18     0.0
+  f32  rad                                      rdi + 0x20     0.0
+## func 0x14030ed00  (3 fields)
+  f32  radius                                   rdi + 0x18     0.0
+  f32  oil                                      rdi + 0x20     0.0
+  f32  oil_max                                  rdi + 0x24     0.0
+## func 0x14030ef20  (1 fields)
+  f32  scale                                    rdi + 0x30     0.0
+## func 0x14030f2e0  (2 fields)
+  A    vehicle_id                               rdi + 0xc      ?
+  A    body_id                                  rdi + 0x10     ?
+## func 0x14030f580  (2 fields)
+  A    pseudo_id                                rdi + 4        0
+  A    segments                                 rdi + 0x38     0
+## func 0x140312750  (6 fields)
+  A    oil_chunk_index                          rdi            0
+  B    oil_data_src                             rdi + 0x60     0
+  B    oil_data_dst                             rdi + 0x64     1
+  B    oil_texture_src                          rdi + 0x68     0
+  B    oil_texture_dst                          rdi + 0x6c     1
+  B    oil_texture_upl                          rdi + 0x70     2
+## func 0x140315520  (2 fields)
+  D    target_object_id                         rsi + 0x240    ?
+  D    label                                    rsi + 0x258    ?
+## func 0x140315eb0  (2 fields)
+  f32  audio_reverb_gain                        rbx + 0x228    0.0
+  f32  audio_reverb_amount                      rbx + 0x22c    0.0
+## func 0x140315fe0  (2 fields)
+  f32  audio_reverb_gain                        rdi + 0x228    0.0
+  f32  audio_reverb_amount                      rdi + 0x22c    0.0
+## func 0x140318e30  (63 fields)
+  f32  mass                                     rsi + 0x2b0    0.0
+  A    value                                    rsi + 0x2b4    ?
+  f32  phys_collision_dampen                    rsi + 0x134    0.0
+  f32  audio_gain                               rsi + 0x238    0.0
+  f32  constraint_range_of_motion               rsi + 0x38c    0.0
+  f32  max_motor_force                          rsi + 0x390    0.0
+  f32  max_motor_speed                          rsi + 0x394    5.0
+  f32  cable_radius                             rsi + 0x398    0.02
+  f32  cable_length                             rsi + 0x39c    0.0
+  f32  seat_health_per_sec                      rsi + 0x7fc    0.0
+  f32  buoy_radius                              rsi + 0x83c    0.0
+  f32  buoy_factor                              rsi + 0x840    0.0
+  f32  buoy_force                               rsi + 0x844    0.0
+  f32  force_emitter_max_force                  rsi + 0x848    0.0
+  f32  force_emitter_max_vector                 rsi + 0x84c    0.0
+  B    force_emitter_default_pitch              rsi + 0x85c    ?
+  f32  force_emitter_blade_height               rsi + 0x860    0.0
+  f32  force_emitter_rotation_speed             rsi + 0x864    1.0
+  f32  force_emitter_blade_physics_length       rsi + 0x868    4.0
+  f32  force_emitter_blade_efficiency           rsi + 0x86c    0.01
+  f32  force_emitter_efficiency                 rsi + 0x870    1.0
+  f32  engine_max_force                         rsi + 0x874    0.0
+  f32  engine_frictionless_force                rsi + 0x878    0.0
+  f32  wheel_radius                             rsi + 0x894    0.0
+  f32  wheel_width                              rsi + 0x898    0.0
+  f32  wheel_wishbone_length                    rsi + 0x880    1.25
+  f32  wheel_suspension_height                  rsi + 0x884    1.0
+  f32  wheel_wishbone_margin                    rsi + 0x888    0.085
+  f32  wheel_suspension_offset                  rsi + 0x88c    0.25
+  f32  wheel_wishbone_offset                    rsi + 0x890    0.0
+  f32  light_intensity                          rsi + 0xdc0    0.0
+  f32  light_range                              rsi + 0xdc4    0.0
+  f32  light_fov                                rsi + 0xdc8    0.0
+  f32  door_lower_limit                         rsi + 0xdfc    0.0
+  f32  door_upper_limit                         rsi + 0xe00    0.0
+  A    door_side_dist                           rsi + 0xe30    1
+  A    door_up_dist                             rsi + 0xe34    1
+  f32  dynamic_min_rotation                     rsi + 0xe68    0.0
+  f32  dynamic_max_rotation                     rsi + 0xe6c    0.0
+  B    logic_gate_subtype                       rsi + 0xe74    ?
+  f32  magnet_force                             rsi + 0xe8c    0.0
+  A    reward_tier                              rsi + 0x2e0    1
+  A    revision                                 rsi + 0x310    ?
+  f32  rudder_surface_area                      rsi + 0xec4    1.0
+  f32  pump_pressure                            rsi + 0xec8    0.0
+  f32  jet_engine_efficiency                    rsi + 0xf08    1.0
+  f32  particle_speed                           rsi + 0xf30    0.05
+  B    inventory_default_item                   rsi + 0xf38    ?
+  f32  electric_charge_capacity                 rsi + 0x1424   0.0
+  f32  electric_magnitude                       rsi + 0x1428   0.0
+  f32  camera_fov_min                           rsi + 0x2928   1.22
+  f32  camera_fov_max                           rsi + 0x292c   0.5
+  f32  monitor_border                           rsi + 0x2930   0.0
+  f32  monitor_inset                            rsi + 0x2934   0.0
+  A    weapon_ammo_capacity                     rsi + 0x2944   ?
+  A    weapon_barrel_length_voxels              rsi + 0x2c6c   8
+  f32  rx_range                                 rsi + 0x2ca0   10.0
+  f32  rx_length                                rsi + 0x2ca4   1.0
+  f32  radar_range                              rsi + 0x2cac   20000.0
+  f32  radar_speed                              rsi + 0x2cb0   0.05
+  f32  piston_len                               rsi + 0x2ce0   0.44
+  f32  piston_cam                               rsi + 0x2ce4   0.075
+  B    max_item_capacity                        rsi + 0x2cec   16
+## func 0x140328750  (1 fields)
+  A    damage                                   r13 + 8        ?
+## func 0x14032b8c0  (1 fields)
+  D    custom_name                              rbp + 0xa8     ?
+## func 0x14032d590  (1 fields)
+  D    custom_name                              rbx + 0xa8     ?
+## func 0x14033fdcb  (3 fields)
+  A    blade_count                              r14            4
+  B    blade_pitch                              rdi + 0x268    ?
+  f32  blade_length                             rdi + 0x294    0.5
+## func 0x14033ff60  (4 fields)
+  f32  collective                               rdi + 0x260    0.0
+  f32  prop_rot                                 rdi + 0x148    0.0
+  f32  prop_vel                                 rdi + 0x150    0.0
+  f32  render_rotation_vel                      rdi + 0x154    0.0
+## func 0x1403402f8  (2 fields)
+  A    active_rotors                            rdi + 0x304    4294967295
+  A    rotor_repair_ticks                       rdi + 0x348    0
+## func 0x140345ca0  (1 fields)
+  f32  scale                                    rsi + 0x168    0.5
+## func 0x140345d5a  (1 fields)
+  f32  parachute_factor                         rsi + 0x170    0.0
+## func 0x140345fe9  (1 fields)
+  A    stall_tick_counter                       rsi + 0x180    0
+## func 0x14034a3f0  (10 fields)
+  B    hat_mesh                                 rdi + 0x1610   ?
+  B    trigger                                  rdi + 0x1138   ?
+  D    trigger_label                            rdi + 0x1520   ?
+  f32  value                                    r12 - 0x20     0.0
+  f32  axis_input                               r12            0.0
+  f32  look                                     r12            0.0
+  f32  trim0                                    rdi + 0x1588   0.0
+  f32  trim1                                    rdi + 0x158c   0.0
+  f32  trim2                                    rdi + 0x1590   0.0
+  f32  trim3                                    rdi + 0x1594   0.0
+## func 0x140350af0  (2 fields)
+  f32  max_force_scale                          rsi + 0x3f8    0.0
+  f32  rps_limit                                rsi + 0x3fc    20.0
+## func 0x140350c2b  (2 fields)
+  f32  throttle_value                           rdi            ?
+  f32  throttle                                 rdi            ?
+## func 0x140350e25  (3 fields)
+  A    startup                                  rsi + 0x404    0
+  f32  rps                                      rsi + 0x3e4    ?
+  f32  temp                                     rsi + 0x410    ?
+## func 0x140352674  (7 fields)
+  f32  air_in                                   rsi + 0x1cc    0.0
+  f32  air_out                                  rsi + 0x1d0    0.0
+  f32  temp_in                                  rsi + 0x1d4    0.0
+  f32  temp_out                                 rsi + 0x1d8    0.0
+  f32  rps                                      rsi + 0x1bc    0.0
+  f32  rps_prev                                 rsi + 0x1c0    0.0
+  f32  prop_rotation                            rsi + 0x1c4    0.0
+## func 0x14035b660  (5 fields)
+  f32  max_force_scalar                         rsi + 0x420    1.0
+  f32  input_velocity                           rsi + 0x300    0.0
+  f32  prev_rotation                            rsi + 0x30c    0.0
+  f32  total_rotation                           rsi + 0x310    0.0
+  f32  axis_value                               rsi + 0x1a8    0.0
+## func 0x14035c7a0  (7 fields)
+  f32  hold_duration                            rdi + 0x494    0.0
+  f32  sensitivity                              rdi + 0x4d0    1.0
+  D    val_1_name                               rdi + 0x520    ?
+  D    val_2_name                               rdi + 0x530    ?
+  f32  output_float                             rdi + 0x4c8    0.0
+  f32  output_float_2                           rdi + 0x4cc    0.0
+  f32  key_anim_value                           rdi + 0x490    0.0
+## func 0x140363403  (2 fields)
+  f32  rot_x_internal                           rsi + 0x67c    0.0
+  f32  rot_y_internal                           rsi + 0x678    0.0
+## func 0x140369560  (1 fields)
+  D    name                                     rsi            ?
+## func 0x140369740  (2 fields)
+  D    name                                     rbx + 0x20     ?
+  D    desc                                     rbx + 0x30     ?
+## func 0x140372eb0  (3 fields)
+  A    id                                       rdi + 0x40     0
+  A    component_id                             rdi + 0x50     0
+  A    built_slot_index                         rdi + 0x54     0
+## func 0x140373030  (2 fields)
+  A    component_id                             rcx + 0x18     0
+  A    node_index                               rdi + 0x1c     0
+## func 0x1403738b0  (1 fields)
+  A    id                                       rcx + 8        0
+## func 0x140374140  (1 fields)
+  f32  v                                        r8             0.0
+## func 0x140374300  (1 fields)
+  f32  v                                        rsi + 0x38     0.0
+## func 0x140376590  (4 fields)
+  D    e                                        rdi + 0x158    ?
+  f32  p1                                       rdi + 0x168    0.0
+  f32  p2                                       rdi + 0x16c    0.0
+  f32  p3                                       rdi + 0x170    0.0
+## func 0x140377940  (1 fields)
+  f32  memory                                   rsi + 0x138    0.0
+## func 0x140378780  (1 fields)
+  D    name                                     rdi + 0x78     ?
+## func 0x140379140  (1 fields)
+  D    l                                        rbp            ?
+## func 0x14037ae50  (3 fields)
+  D    name                                     rsi + 0x90     ?
+  f32  v                                        rsi + 0xa4     0.0
+  A    i                                        rsi + 0xa0     ?
+## func 0x14037c602  (2 fields)
+  f32  te                                       rdi + 0x180    0.0
+  f32  pe                                       rdi + 0x184    0.0
+## func 0x14037d796  (2 fields)
+  f32  ct                                       rdi + 0xb8     1.0
+  f32  dt                                       rdi + 0xbc     1.0
+## func 0x14037d891  (2 fields)
+  A    c1                                       rdi + 0xc0     ?
+  A    c2                                       rdi + 0xc4     ?
+## func 0x14037e166  (2 fields)
+  f32  on                                       rdi + 0xbc     1.0
+  f32  off                                      rdi + 0xc0     1.0
+## func 0x14037e26c  (1 fields)
+  A    c                                        rdi + 0xb8     0
+## func 0x14037ed80  (1 fields)
+  B    i                                        rdi + 0x178    0
+## func 0x14037f600  (1 fields)
+  A    i                                        rsi + 0x1f8    0
+## func 0x14037fc40  (1 fields)
+  B    i                                        rdi + 0x178    0
+## func 0x1403802a0  (3 fields)
+  D    n                                        rsi + 0x78     ?
+  D    on                                       rsi + 0x88     ?
+  D    off                                      rsi + 0x98     ?
+## func 0x140380db0  (1 fields)
+  D    n                                        rbp + 0x78     ?
+## func 0x140381430  (1 fields)
+  f32  vp                                       rsi + 0xbc     0.0
+## func 0x140381b00  (1 fields)
+  D    e                                        rbp + 0x298    ?
+## func 0x140383742  (2 fields)
+  f32  te                                       rsi + 0x1f8    0.0
+  f32  pe                                       rsi + 0x1fc    0.0
+## func 0x140383d30  (2 fields)
+  A    count                                    rsi + 0x9f8    32
+  B    offset                                   rsi + 0x9fc    ?
+## func 0x140385d20  (1 fields)
+  D    l                                        rsi + 0xd0     ?
+## func 0x140386710  (3 fields)
+  D    l                                        rsi + 0x90     ?
+  D    on                                       rsi + 0xa0     ?
+  D    off                                      rsi + 0xb0     ?
+## func 0x140387460  (1 fields)
+  D    e                                        rbp + 0xd8     ?
+## func 0x140387bc0  (1 fields)
+  D    e                                        rbp + 0x198    ?
+## func 0x1403885d0  (1 fields)
+  D    e                                        rbp + 0x298    ?
+## func 0x140389480  (1 fields)
+  f32  t                                        rdi + 0x100    0.0
+## func 0x14038a1a0  (1 fields)
+  f32  t                                        rdi + 0x140    0.0
+## func 0x14038b870  (1 fields)
+  D    script                                   rbp + 0x650    ?
+## func 0x14038c890  (2 fields)
+  D    n                                        rbp + 0x50     ?
+  D    v                                        rbp + 0x60     ?
+## func 0x14038dee0  (1 fields)
+  A    id                                       rcx + 8        ?
+## func 0x1403900d0  (6 fields)
+  D    name                                     rbp + 0x20     ?
+  D    description                              rbp + 0x30     ?
+  A    width                                    rbp + 0x40     ?
+  A    length                                   rbp + 0x44     ?
+  A    id_counter                               rbp + 0x70     ?
+  A    id_counter_node                          rbp + 0x74     ?
+## func 0x140395930  (1 fields)
+  A    damage_counter                           rbx + 0x450    0
+## func 0x14039acbf  (1 fields)
+  A    damage_counter                           rsi + 0x670    0
+## func 0x14039cc4f  (1 fields)
+  f32  rotation_speed                           rdi + 0x6ac    1.0
+## func 0x14039ccfb  (3 fields)
+  f32  light_rotation                           rdi + 0x6a4    0.0
+  f32  input_rotation                           rdi + 0x6a0    0.0
+  f32  input_light_pivot                        rdi + 0x698    0.0
+## func 0x14039f070  (3 fields)
+  D    name                                     rdi + 8        ?
+  f32  val_float                                rdi + 0x6c     0.0
+  A    val_bits                                 rdi + 0x74     ?
+## func 0x1403a1ed0  (4 fields)
+  A    input_ch_1                               rdi + 0x748    0
+  A    input_ch_2                               rdi + 0x74c    1
+  A    input_ch_3                               rdi + 0x750    2
+  A    damage_counter                           rdi + 0x628    0
+## func 0x1403a72b0  (4 fields)
+  f32  grip_factor                              rdi + 0x460    1.0
+  f32  steering_rotation                        rdi + 0x224    0.0
+  f32  prev_rotation                            rdi + 0x21c    0.0
+  f32  rotation_speed                           rdi + 0x220    0.0
+## func 0x1403ab550  (8 fields)
+  f32  grip_factor                              rdi + 0x6e8    1.0
+  f32  stiffness_factor                         rdi + 0x6ec    0.4
+  f32  damping_factor                           rdi + 0x6f0    0.11
+  f32  wheel_size                               rdi + 0x6f4    1.0
+  f32  tyre_pressure                            rdi + 0x6f8    1.0
+  f32  steering_rotation                        rdi + 0x45c    0.0
+  f32  prev_rotation                            rdi + 0x454    0.0
+  f32  rotation_speed                           rdi + 0x458    0.0
+## func 0x1403b2620  (1 fields)
+  f32  grip_factor                              rsi + 0x170    1.0
+## func 0x1403b3690  (2 fields)
+  f32  throttle_min                             rsi + 0x338    0.01
+  f32  throttle_max                             rsi + 0x33c    1.0
+## func 0x1403b3b37  (1 fields)
+  A    damage_counter                           rsi + 0x340    0
+## func 0x1403b6b80  (1 fields)
+  f32  input_velocity                           rsi + 0xcb0    0.0
+## func 0x1403ba6e0  (6 fields)
+  f32  m_fov_x                                  rdi + 0x418    0.0
+  f32  m_fov_y                                  rdi + 0x41c    0.0
+  f32  m_pitch_angle                            rdi + 0x420    0.0
+  f32  m_range_factor                           rdi + 0x458    0.0
+  A    m_interval_counter                       rdi + 0x460    ?
+  f32  m_sweep_angle                            rdi + 0x468    0.0
+## func 0x1403cff50  (16 fields)
+  f32  sensitivity                              rdi + 0x6a4    0.2
+  f32  timer_scalar_1                           rdi + 0x6dc    0.0
+  f32  timer_scalar_2                           rdi + 0x6e0    0.0
+  D    property_text                            rdi + 0x808    ?
+  f32  sensor_radius                            rdi + 0x870    5.0
+  f32  radar_fov                                rdi + 0x6b0    0.0
+  f32  radar_rotation                           rdi + 0x6ac    0.0
+  f32  input_float_1_val                        rdi + 0x694    0.0
+  f32  input_float_2_val                        rdi + 0x698    0.0
+  f32  input_float_3_val                        rdi + 0x69c    0.0
+  f32  output_float_val                         rdi + 0x6b8    0.0
+  f32  pid_controller_error                     rdi + 0x770    0.0
+  f32  pid_controller_prev_error                rdi + 0x774    0.0
+  A    timer                                    rdi + 0x6e4    ?
+  A    timer_2                                  rdi + 0x6e8    ?
+  A    damage_counter                           rdi + 0x838    ?
+## func 0x1403d79e0  (1 fields)
+  f32  slider_target_pos                        rsi + 0x9e4    0.0
+## func 0x1403e2100  (1 fields)
+  f32  keel_force_factor                        rdi + 0x180    1.0
+## func 0x1403e21ba  (3 fields)
+  f32  rotation                                 rdi + 0x274    0.0
+  f32  input_rotation                           rdi + 0x270    0.0
+  f32  keel_vel                                 rdi + 0x1d0    0.0
+## func 0x1403e5320  (1 fields)
+  f32  cable_position                           rdi + 0x528    0.0
+## func 0x1403e8110  (8 fields)
+  A    decimal_point_pos                        rdi + 0x200    ?
+  D    audio_data                               rdi + 0x350    ?
+  f32  volume                                   rdi + 0x360    1.0
+  f32  pitch                                    rdi + 0x364    1.0
+  f32  siren_intensity                          rdi + 0x368    0.0
+  f32  value_f32                                rdi + 0x148    0.0
+  f32  value_f32_2                              rdi + 0x14c    0.0
+  A    damage_counter                           rdi + 0x36c    ?
+## func 0x1403efb10  (2 fields)
+  f32  heat_factor                              rsi + 0x1c0    0.0
+  A    damage_counter                           rsi + 0x1b8    0
+## func 0x1403f8932  (5 fields)
+  A    fluid_type                               rsi + 0x588    1
+  A    fluid_filter                             rsi + 0x594    0
+  f32  fluid_fill                               r14            1.0
+  f32  audio_base_pitch                         rsi + 0x930    1.0
+  f32  rcs_thrust                               r14            1.0
+## func 0x1403f8c4a  (1 fields)
+  f32  rcs_threshold                            rsi + 0x91c    0.1
+## func 0x1403fdd72  (2 fields)
+  B    gear_ratio_1                             rsi + 0x2e0    1
+  B    gear_ratio_2                             rsi + 0x2e4    5
+## func 0x1403ffb60  (1 fields)
+  f32  max_force_scale                          rsi + 0x25c    0.0
+## func 0x140403d90  (1 fields)
+  f32  spawn_charge                             rsi + 0x2a8    1.0
+## func 0x140403ee9  (2 fields)
+  f32  throttle                                 rsi + 0x2a0    0.0
+  f32  rotations_per_second                     rsi + 0x2a4    0.0
+## func 0x140405830  (1 fields)
+  f32  rotation_speed                           rdi + 0x2a8    0.0
+## func 0x140409006  (81 fields)
+  B    content                                  rcx + 4        ?
+  B    iron                                     rdi + 8        ?
+  B    alu                                      rdi + 0xc      ?
+  B    gold                                     rdi + 0x10     ?
+  B    gold_dirt                                rdi + 0x14     ?
+  B    uran                                     rdi + 0x18     ?
+  B    i_iron                                   rdi + 0x1c     ?
+  B    i_steel                                  rdi + 0x20     ?
+  B    i_alu                                    rdi + 0x24     ?
+  B    i_gold_dirt                              rdi + 0x28     ?
+  B    i_gold                                   rdi + 0x2c     ?
+  B    i_uran                                   rdi + 0x30     ?
+  B    i_prop                                   rdi + 0x34     ?
+  B    f_anc                                    rdi + 0x38     ?
+  B    f_ang                                    rdi + 0x3c     ?
+  B    f_ar                                     rdi + 0x40     ?
+  B    f_bl                                     rdi + 0x44     ?
+  B    f_bw                                     rdi + 0x48     ?
+  B    f_ba                                     rdi + 0x4c     ?
+  B    f_bb                                     rdi + 0x50     ?
+  B    f_bd                                     rdi + 0x54     ?
+  B    f_cl                                     rdi + 0x58     ?
+  B    f_co                                     rdi + 0x5c     ?
+  B    f_do                                     rdi + 0x60     ?
+  B    f_gu                                     rdi + 0x64     ?
+  B    f_had                                    rdi + 0x68     ?
+  B    f_hak                                    rdi + 0x6c     ?
+  B    f_he                                     rdi + 0x70     ?
+  B    f_jo                                     rdi + 0x74     ?
+  B    f_lab                                    rdi + 0x78     ?
+  B    f_lan                                    rdi + 0x7c     ?
+  B    f_ma                                     rdi + 0x80     ?
+  B    f_mi                                     rdi + 0x84     ?
+  B    f_pe                                     rdi + 0x88     ?
+  B    f_pik                                    rdi + 0x8c     ?
+  B    f_pin                                    rdi + 0x90     ?
+  B    f_po                                     rdi + 0x94     ?
+  B    f_re                                     rdi + 0x98     ?
+  B    f_ro                                     rdi + 0x9c     ?
+  B    f_sab                                    rdi + 0xa0     ?
+  B    f_sal                                    rdi + 0xa4     ?
+  B    f_sar                                    rdi + 0xa8     ?
+  B    f_sc                                     rdi + 0xac     ?
+  B    f_sb                                     rdi + 0xb0     ?
+  B    f_sh                                     rdi + 0xb4     ?
+  B    f_sp                                     rdi + 0xb8     ?
+  B    f_se                                     rdi + 0xbc     ?
+  B    f_sl                                     rdi + 0xc0     ?
+  B    f_sna                                    rdi + 0xc4     ?
+  B    f_sng                                    rdi + 0xc8     ?
+  B    f_sno                                    rdi + 0xcc     ?
+  B    f_sp                                     rdi + 0xd0     ?
+  B    f_tr                                     rdi + 0xd4     ?
+  B    f_tf                                     rdi + 0xd8     ?
+  B    f_vi                                     rdi + 0xdc     ?
+  B    f_yt                                     rdi + 0xe0     ?
+  B    c_bc                                     rdi + 0xe4     ?
+  B    c_bbc                                    rdi + 0xe8     ?
+  B    c_cc                                     rdi + 0xec     ?
+  B    c_dc                                     rdi + 0xf0     ?
+  B    c_fl                                     rdi + 0xf4     ?
+  B    c_ha                                     rdi + 0xf8     ?
+  B    c_hg                                     rdi + 0xfc     ?
+  B    c_hc                                     rdi + 0x100    ?
+  B    c_je                                     rdi + 0x104    ?
+  B    c_jl                                     rdi + 0x108    ?
+  B    c_jc                                     rdi + 0x10c    ?
+  B    c_kc                                     rdi + 0x110    ?
+  B    c_mc                                     rdi + 0x114    ?
+  B    c_ml                                     rdi + 0x118    ?
+  B    c_orl                                    rdi + 0x11c    ?
+  B    c_pi                                     rdi + 0x120    ?
+  B    c_rkc                                    rdi + 0x124    ?
+  B    c_rl                                     rdi + 0x128    ?
+  B    c_sl                                     rdi + 0x12c    ?
+  B    c_sn                                     rdi + 0x130    ?
+  B    c_srl                                    rdi + 0x134    ?
+  B    c_sp                                     rdi + 0x138    ?
+  B    c_sl                                     rdi + 0x13c    ?
+  B    c_st                                     rdi + 0x140    ?
+  B    hyd                                      rdi + 0x144    ?
+## func 0x14040b306  (3 fields)
+  f32  cam_rotation                             rdi            0.0
+  f32  rotations_per_second                     rdi + 4        0.0
+  f32  force                                    rdi + 8        0.0
+## func 0x140415620  (3 fields)
+  f32  fluid_fill                               r15            1.0
+  f32  coal_fill                                r14            1.0
+  f32  starting_rotation                        rsi + 0xae8    ?
+## func 0x14041593a  (4 fields)
+  f32  coal_render_level                        rsi + 0x710    ?
+  f32  coal_life                                rsi + 0x744    ?
+  A    ignition_counter                         rsi + 0x754    0
+  f32  temperature                              rsi + 0x758    20.0
+## func 0x140422460  (1 fields)
+  f32  fuel_spawn                               rdi            1.0
+## func 0x140422536  (5 fields)
+  f32  temp                                     r13            ?
+  f32  react                                    r12            ?
+  f32  react_next                               r14            ?
+  f32  insert                                   rsi            ?
+  f32  fuel_factor                              rdi            ?
+## func 0x1404235d0  (1 fields)
+  f32  spring_factor                            rsi + 0x348    0.25
+## func 0x1404290b0  (8 fields)
+  B    property_ammo_type                       rbx + 0x328    7
+  B    property_ammo_damage                     rbx + 0x32c    ?
+  A    reload_counter                           rbx + 0x330    ?
+  A    ammo_shift_counter                       rbx + 0x3c4    ?
+  B    ammo_type                                rbx + 0x3f0    7
+  B    ammo_damage                              rbx + 0x3f4    ?
+  A    ammo_loaded                              rbx + 0x3f8    ?
+  A    rng                                      rbx + 0x95c    0
+## func 0x140438246  (2 fields)
+  f32  pitch                                    rsi + 0x9a8    0.0
+  f32  yaw                                      rsi + 0x9ac    0.0
+## func 0x140438790  (4 fields)
+  f32  fuel_factor                              rdi            0.0
+  A    fuel_capacity                            rdi + 4        0
+  A    fuel_count                               rdi + 8        0
+  A    fuel_burned                              rdi + 0xc      0
+## func 0x140439632  (3 fields)
+  f32  burn_rate                                rsi + 0x7a4    1.0
+  f32  fuel_factor                              rsi + 0x7a8    1.0
+  f32  fin_factor                               rsi + 0x808    1.0
+## func 0x1404411e6  (1 fields)
+  f32  muzzle_velocity                          rbp + 0x1ac    75.0
+## func 0x140441a30  (1 fields)
+  f32  temp                                     rcx + 0xec     0.0
+## func 0x140441b36  (3 fields)
+  f32  rps                                      rcx + 0x254    0.0
+  A    fire                                     rdi + 0x280    0
+  f32  temp                                     rdi + 0x260    0.0
+## func 0x14044e0c0  (1 fields)
+  f32  input_state                              rdi + 0x6a8    0.0
+## func 0x140451006  (3 fields)
+  f32  slider_pos                               rsi + 0x318    0.0
+  f32  rps                                      rsi + 0x31c    0.0
+  f32  well_head_bore_depth                     rsi + 0x3b8    0.0
+## func 0x14045a3b0  (1 fields)
+  A    current_tick                             rsi + 0x26c    0
+## func 0x14045b290  (26 fields)
+  A    last_active_tick                         rdi + 0x2ac    4294967295
+  A    current_tick                             rdi + 0x2bc    1
+  B    c_bc                                     rdi + 0x24c    ?
+  B    c_bbc                                    rdi + 0x250    ?
+  B    c_cc                                     rdi + 0x254    ?
+  B    c_dc                                     rdi + 0x258    ?
+  B    c_fl                                     rdi + 0x25c    ?
+  B    c_ha                                     rdi + 0x260    ?
+  B    c_hg                                     rdi + 0x264    ?
+  B    c_hc                                     rdi + 0x268    ?
+  B    c_je                                     rdi + 0x26c    ?
+  B    c_jl                                     rdi + 0x270    ?
+  B    c_jc                                     rdi + 0x274    ?
+  B    c_kc                                     rdi + 0x278    ?
+  B    c_mc                                     rdi + 0x27c    ?
+  B    c_ml                                     rdi + 0x280    ?
+  B    c_orl                                    rdi + 0x284    ?
+  B    c_pi                                     rdi + 0x288    ?
+  B    c_rkc                                    rdi + 0x28c    ?
+  B    c_rl                                     rdi + 0x290    ?
+  B    c_sl                                     rdi + 0x294    ?
+  B    c_sn                                     rdi + 0x298    ?
+  B    c_srl                                    rdi + 0x29c    ?
+  B    c_sp                                     rdi + 0x2a0    ?
+  B    c_sl                                     rdi + 0x2a4    ?
+  B    c_st                                     rdi + 0x2a8    ?
+## func 0x14045e5c2  (1 fields)
+  A    category                                 rsi + 0x250    ?
+## func 0x140463090  (3 fields)
+  A    tech_id                                  rdi + 4        4294967295
+  D    component_name                           rdi + 8        ?
+  A    ticks                                    rdi + 0x18     ?
+## func 0x140492960  (1 fields)
+  A    timer                                    rdi + 4        0
+## func 0x140492bf0  (2 fields)
+  A    count                                    rbp + 0x77     ?
+  A    count                                    rbp + 0x77     ?
+## func 0x1404b04d0  (1 fields)
+  A    unique_id                                rcx + 0x147c   ?
+## func 0x1404bb180  (4 fields)
+  D    definition                               rsi            ?
+  A    trans_index                              rsi + 0x10     ?
+  D    d                                        rsi            ?
+  A    t                                        rsi + 0x10     ?
+## func 0x1404bb330  (2 fields)
+  A                                             rbp + 0x58     ?
+  A                                             rbp + 0x58     ?
+## func 0x1404be150  (1 fields)
+  D    username                                 rdi + 8        ?
+## func 0x1404c7030  (4 fields)
+  A    data_version                             rcx + 0x2a0    ?
+  D    map_name                                 rbx + 0x2c8    ?
+  C                                             rsp + 0x78     None
+  A    bodies_id                                rbx + 0x17c    32
+## func 0x1404f2bf0  (2 fields)
+  f32  magnitude                                rsi + 0x200    0.0
+  f32  size                                     rsi + 0x204    0.0
+## func 0x140512d20  (1 fields)
+  f32  height                                   rbx + 0x210    0.0
+## func 0x140515190  (1 fields)
+  B    item_type                                rbx + 0x200    ?
+## func 0x1405166c0  (1 fields)
+  B    ore_type                                 rbx + 0x200    ?
+## func 0x140516c70  (3 fields)
+  B    type                                     rsi + 0x88     ?
+  A    count                                    rsi + 0x8c     100
+  f32  cooldown                                 rsi + 0x90     120.0
+## func 0x140517600  (12 fields)
+  B    fish_type                                rdi            ?
+  A    uid                                      rdi + 0x88     ?
+  B    state_ticks                              rdi + 0x8c     ?
+  B    scare_timer                              rdi + 0x90     ?
+  B    jump_timer                               rdi + 0x94     ?
+  B    out_of_water_timer                       rdi + 0x98     ?
+  f32  scale                                    rdi + 0x9c     0.0
+  f32  turn_factor                              rdi + 0xa0     0.0
+  f32  door_stuck                               rdi + 0xa4     0.0
+  A    despawn_ticks                            rdi + 0xc0     ?
+  B    current_anim                             rdi + 0x730    ?
+  B    previous_anim                            rdi + 0x734    ?
+## func 0x14051b7b0  (2 fields)
+  A    vehicle_id                               rdi            ?
+  A    body_id                                  rdi + 4        ?
+## func 0x14051b940  (6 fields)
+  B    rope_type                                rcx + 0x78     ?
+  f32  spool_slack                              rdi + 0x84     0.0
+  f32  rope_length                              rdi + 0x88     0.0
+  C    character_peer_id                        rdi + 0xc6     None
+  A    movable_id_0                             rdi + 0xc8     ?
+  A    movable_id_1                             rdi + 0xcc     ?
+## func 0x14051cf41  (1 fields)
+  B    type                                     rdi            ?
+## func 0x14051d120  (6 fields)
+  f32  rope_length_0                            rsi + 0x130    0.0
+  f32  rope_length_1                            rsi + 0x134    0.0
+  f32  rope_length_2                            rsi + 0x138    0.0
+  f32  rope_length_3                            rsi + 0x13c    0.0
+  f32  extend_factor                            rsi + 0x140    0.0
+  A    fish_capacity                            rsi + 0x168    0
+## func 0x14051e410  (4 fields)
+  f32  rope_length_0                            rsi + 0x130    0.0
+  f32  rope_length_1                            rsi + 0x134    0.0
+  f32  rope_length_2                            rsi + 0x138    0.0
+  f32  rope_length_3                            rsi + 0x13c    0.0
+## func 0x140537690  (38 fields)
+  B    type                                     rcx + 8        ?
+  A    id                                       rdi + 0x98     ?
+  C    char_network_peer_id                     rdi + 0x42c    None
+  D    parent_mission_path                      rdi + 0x4f8    65535
+  A    parent_mission_component_id              rdi + 0x508    4294967295
+  f32  pseudo_health                            rdi + 0x3f4    100.0
+  f32  pseudo_max_health                        rdi + 0x3f8    100.0
+  f32  pseudo_health_factor                     rdi + 0x400    0.0
+  f32  pseudo_oxygen                            rdi + 0x404    100.0
+  f32  pseudo_dryness                           rdi + 0x410    100.0
+  f32  pseudo_radiation                         rdi + 0x414    0.0
+  f32  pseudo_temp                              rdi + 0x408    5.0
+  B    pseudo_incapacitated_ticks               rdi + 0x418    36000
+  A    pseudo_debuffs                           rdi + 0x420    ?
+  B    char_outfit                              rdi + 0x120    ?
+  A    char_color_seed                          rdi + 0x124    ?
+  B    char_type                                rdi + 0x128    ?
+  f32  parachute_factor                         rdi + 0x3f0    0.0
+  D    network_name                             rdi + 0x4c8    65535
+  A    fishing_float_movable_id                 rdi + 0x4ec    ?
+  A    fishing_hook_movable_id                  rdi + 0x4f0    ?
+  A    ai_team                                  rdi + 0x3d0    ?
+  A    ai_target_teams                          rdi + 0x3d4    ?
+  f32  animal_scale                             rdi + 0x578    0.0
+  f32  creature_scale                           rdi + 0x584    0.0
+  B    weapon_cartridge_type                    rdi + 0xe0     7
+  A    bomb_vehicle_id                          rdi + 0xe8     4294967295
+  A    bomb_body_id                             rdi + 0xec     4294967295
+  A    bomb_unique_id                           rdi + 0xf0     4294967295
+  A    drill_segments                           rdi + 0x114    1
+  f32  fire_size                                rdi + 0x51c    1.0
+  f32  fire_magnitude                           rdi + 0x520    0.0
+  A    fire_vehicle_parent_id                   rdi + 0x528    ?
+  f32  explosion_ignition_point                 rdi + 0x56c    1.0
+  f32  explosion_magnitude                      rdi + 0x570    1.0
+  A    time_alive                               rdi + 0x424    ?
+  A    lifespan                                 rdi + 0x428    ?
+  f32  movable_scale                            rdi + 0x50c    1.0
+## func 0x140546910  (1 fields)
+  A    object_counter                           r14            ?
+## func 0x140547aa0  (1 fields)
+  f32  character_health                         r8 + 0x3f4     0.0
+## func 0x140547f00  (6 fields)
+  f32  magnitude                                r8             0.0
+  f32  size                                     r8 + 4         0.0
+  f32  ignition                                 r8 + 8         0.0
+  A    parent_id                                r8 + 0x84      0
+  f32  explosion_ignition_point                 r8 + 0x6c      0.0
+  f32  explosion_magnitude                      r8 + 0x70      0.0
+## func 0x1405485f0  (8 fields)
+  A    id                                       rdi + 4        ?
+  A    vehicle_group_id                         rdi + 8        ?
+  D    custom_tooltip                           rdi + 0x98     ?
+  D    addon_tags                               rdi + 0x120    ?
+  D    parent_mission_path                      rdi + 0x130    ?
+  A    parent_mission_component_id              rdi + 0x140    ?
+  D    map_name                                 rdi + 0xc0     ?
+  A    team                                     rdi + 0x160    ?
+## func 0x1405490e0  (2 fields)
+  A    id                                       rsi + 0xc4     ?
+  D    edit_grid_id                             rsi + 0x18     ?
+## func 0x1405571f0  (2 fields)
+  A    vehicle_counter                          rdi            0
+  A    group_counter                            rdi + 4        0
+## func 0x140560240  (5 fields)
+  f32  radius                                   rsi + 0x200    0.0
+  f32  height                                   rsi + 0x204    0.0
+  f32  eruption_radius                          rsi + 0x224    0.0
+  A    particle_effect                          rsi + 0x228    ?
+  f32  particle_radius                          rsi + 0x238    0.0
+## func 0x140560400  (6 fields)
+  f32  radius                                   rdi + 0x200    0.0
+  f32  height                                   rdi + 0x204    0.0
+  D    heightmap_filename                       rdi + 0x208    ?
+  f32  eruption_radius                          rdi + 0x224    0.0
+  A    particle_effect                          rdi + 0x228    ?
+  f32  particle_radius                          rdi + 0x238    0.0
+## func 0x1405610b0  (9 fields)
+  f32  radius                                   rdi + 0x20     0.0
+  f32  eruption_anim_prev                       rdi + 0x64     0.0
+  f32  eruption_anim_next                       rdi + 0x68     0.0
+  f32  volcanic_heat                            rdi + 0x6c     0.0
+  f32  rumble_volume                            rdi + 0x70     0.0
+  D    heightmap_filename                       rdi + 0x28     ?
+  f32  eruption_radius                          rdi + 0x44     0.0
+  A    particle_effect                          rdi + 0xa8     ?
+  f32  particle_radius                          rdi + 0xb8     0.0
+## func 0x1405672b0  (2 fields)
+  A    purchase_cost                            rbx + 0x288    0
+  f32  sea_floor_height                         rbx + 0x27c    -6.0
+## func 0x140576ae0  (1 fields)
+  D    tags                                     rbx + 0x20     ?
+## func 0x140576c00  (5 fields)
+  A    c                                        rdi + 8        ?
+  A    u                                        rdi + 0x34     ?
+  f32  d                                        rdi + 0x150    0.0
+  f32  j                                        rdi + 0x154    0.0
+  A    p                                        rdi + 0x38     ?
+## func 0x14058df70  (4 fields)
+  f32  multiplier                               rdi + 0x18     0.0
+  f32  radius                                   rdi + 0x1c     0.0
+  f32  half_height                              rdi + 0x20     0.0
+  B    fish_type                                rdi + 0x24     ?
+## func 0x14058eae0  (1 fields)
+  A    fish_uid                                 rdi + 0x738    0
+## func 0x14059c320  (4 fields)
+  B    key_type                                 rdi            2
+  B    type                                     rdi + 4        ?
+  D    name                                     rdi + 8        ?
+  D    value                                    rdi + 0x18     ?
+## func 0x14059c4f0  (2 fields)
+  B    key_type                                 rcx + 0x30     2
+  D    name                                     rsi + 0x38     ?
+## func 0x1405cb390  (17 fields)
+  A    id                                       rsi + 0x78     ?
+  A    vehicle_parent_id                        rsi + 0x7c     ?
+  D    cargo_zone_import_cargo_type             rsi + 0xc0     ?
+  D    name                                     rsi + 0xc0     ?
+  D    display_name                             rsi + 0xd0     ?
+  f32  zone_radius                              rsi + 0x104    2.5
+  B    dynamic_object_type                      rsi + 0x108    ?
+  B    character_outfit_category                rsi + 0x10c    ?
+  B    character_type                           rsi + 0x110    ?
+  B    character_special_outfit                 rsi + 0x114    ?
+  D    vehicle_file_name                        rsi + 0x130    ?
+  B    vehicle_file_store                       rsi + 0x140    ?
+  f32  explosion_magnitude                      rsi + 0x150    1.0
+  f32  flare_hue                                rsi + 0x154    0.0
+  D    vehicle_button_name                      rsi + 0x160    ?
+  A    ice_type                                 rsi + 0x170    ?
+  f32  ice_scale                                rsi + 0x174    1.0
+## func 0x1405cf0f0  (4 fields)
+  A    id                                       r14            ?
+  D    tile                                     r14 + 8        ?
+  D    name                                     r14 + 0x18     ?
+  A    env_mod_spawn_num                        r14 + 0x2c     ?
+## func 0x1405cf870  (2 fields)
+  A    location_id_counter                      rdi            0
+  A    component_id_counter                     rdi + 0x20     0
+## func 0x1405cfc10  (9 fields)
+  A    unique_id                                rdi            ?
+  A    vehicle_parent_id                        rdi + 8        ?
+  D    display_name                             rdi + 0x58     ?
+  D    tags                                     rdi + 0x68     ?
+  f32  zone_radius                              rdi + 0x150    0.0
+  A    dynamic_object_id                        rdi + 0x154    ?
+  A    global_vehicle_id                        rdi + 0x164    ?
+  A    global_group_id                          rdi + 0x160    ?
+  D    vehicle_button_name                      rdi + 0x170    ?
+## func 0x1405d2980  (3 fields)
+  A    script_id                                rdi            ?
+  B    store                                    rdi + 0xa8     ?
+  D    path                                     rdi + 0xb0     ?
+## func 0x1405d5cb0  (3 fields)
+  D    folder_path                              rdi            ?
+  B    file_store                               rdi + 0x10     ?
+  D    name                                     rdi + 0x18     ?
+## func 0x1405d68e0  (1 fields)
+  A    objective_id                             rdi + 0x20     0
+## func 0x1405eba00  (3 fields)
+  A    version                                  rcx + 8        0
+  A    script_ui_id_counter                     rbp + 0x210    0
+  A    dlc                                      rbp + 0xbbbc0  0
+## func 0x140846630  (1 fields)
+  A                                             r8 + 0x104     ?
+## func 0x140851a70  (1 fields)
+  A                                             r8 + 0x104     0
+## func 0x140852b40  (1 fields)
+  A    fish_uid                                 r15 + 0x133d0  ?
+## func 0x14085e5b0  (1 fields)
+  A                                             r8             ?
+## func 0x1408f763d  (2 fields)
+  A    axis                                     rbx + 0x48     ?
+  A    pad_index                                rbx + 0x40     ?
+## func 0x1408fb020  (2 fields)
+  B    hat_mesh                                 rbx + 0x48     ?
+  B    hat_mesh_override                        rbx + 0x6c     ?
+## func 0x1408fb3b0  (2 fields)
+  B    hat_mesh                                 rdi + 0x48     ?
+  B    hat_mesh_override                        rdi + 0x6c     ?
+## func 0x1408fc1f0  (2 fields)
+  A    size                                     rbp + 0x58     ?
+  A    size                                     rbp + 0x58     ?
+## func 0x1408fdfe0  (5 fields)
+  D    value                                    rbx            ?
+  D    value                                    None           ?
+  C                                             rbp + 0x30     None
+  D                                             rbx            ?
+  D                                             None           ?
+## func 0x1408fe590  (5 fields)
+  A    value                                    rax + rdx*4    ?
+  A    value                                    r8             ?
+  C                                             rsp + 0x68     None
+  A                                             r8             ?
+  A                                             r8             ?
+## func 0x1409000ad  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140901230  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140901a3d  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140901ce0  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140902240  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x1409027a0  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140903760  (1 fields)
+  B    orientation                              r15 + 0xc      ?
+## func 0x1409042a0  (3 fields)
+  A    flags                                    rbx + 0xc      ?
+  A    physics_shape                            rbx + 0x10     ?
+  A    buoy_pipes                               rbx + 0x38     ?
+## func 0x1409044bb  (3 fields)
+  A    flags                                    rbx + 0xc      ?
+  A    physics_shape                            rbx + 0x10     ?
+  A    buoy_pipes                               rbx + 0x38     ?
+## func 0x140904e30  (3 fields)
+  A    size                                     rbp + 0x40     ?
+  A    size                                     rbp + 0x40     ?
+  C                                             rbp + 0x40     None
+## func 0x140905f70  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140906520  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140906d9d  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140908a60  (1 fields)
+  C                                             rsp + 0x68     None
+## func 0x140909b5d  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x14090b550  (5 fields)
+  A    type                                     rsp + 0x70     ?
+  A    type                                     rsp + 0x70     ?
+  A                                             rsp + 0x70     ?
+  A                                             rsp + 0x90     ?
+  A                                             rsp + 0x70     ?
+## func 0x14090bbe0  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x14090c5d0  (1 fields)
+  C                                             rsp + 0x88     None
+## func 0x14090fe00  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x1409103c0  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140910d80  (3 fields)
+  A    size                                     rsp + 0x78     ?
+  A    size                                     rsp + 0x78     ?
+  C                                             rsp + 0x78     None
+## func 0x140911a60  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140912020  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140913a00  (5 fields)
+  D    id                                       rbx            ?
+  D    id                                       rbx + 8        ?
+  C                                             rbp + 0x30     None
+  D    id                                       rbx            ?
+  D    id                                       rbx + 8        ?
+## func 0x14091432d  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x1409147e0  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140914d30  (1 fields)
+  C                                             rsp + 0x68     None
+## func 0x140915270  (1 fields)
+  C                                             rsp + 0x68     None
+## func 0x1409157b0  (1 fields)
+  C                                             rsp + 0x68     None
+## func 0x140916150  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140916690  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140916bf0  (5 fields)
+  D    username                                 r14 + 8        32
+  D    username                                 r15 + 8        32
+  C                                             rbp + 0x48     None
+  D    username                                 r14 + 8        32
+  D    username                                 rdi + 8        32
+## func 0x140917410  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140917950  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140917e90  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140918400  (1 fields)
+  C                                             rsp + 0x88     None
+## func 0x140918a90  (5 fields)
+  C    value                                    rax + rdx*2    None
+  C    value                                    r8             None
+  C                                             rsp + 0x78     None
+  C                                             r8             None
+  C                                             r8             None
+## func 0x140919160  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140919d10  (1 fields)
+  C                                             rsp + 0xa8     None
+## func 0x14091b450  (2 fields)
+  f32  mass                                     rbp + 0x214    0.0
+  f32  mass                                     rbx + 0x214    0.0
+## func 0x14091b920  (2 fields)
+  f32  radius                                   rbp + 0x224    0.0
+  f32  radius                                   rbx + 0x224    0.0
+## func 0x14091c300  (4 fields)
+  f32  length                                   rbp + 0x20c    0.0
+  f32  radius                                   rbp + 0x210    0.0
+  f32  length                                   rbx + 0x20c    0.0
+  f32  radius                                   rbx + 0x210    0.0
+## func 0x14091f1b0  (2 fields)
+  B    item_type                                r15 + 0x200    ?
+  B    item_type                                rbx + 0x200    ?
+## func 0x14091f610  (2 fields)
+  f32  height                                   rbp + 0x210    0.0
+  f32  height                                   rbx + 0x210    0.0
+## func 0x14091fef0  (4 fields)
+  f32  magnitude                                r12 + 0x200    0.0
+  f32  size                                     r12 + 0x204    0.0
+  f32  magnitude                                rbx + 0x200    0.0
+  f32  size                                     rbx + 0x204    0.0
+## func 0x140920c40  (2 fields)
+  B    ore_type                                 rbp + 0x200    ?
+  B    ore_type                                 rbx + 0x200    ?
+## func 0x1409210a0  (5 fields)
+  A    index                                    r8             4294967295
+  A    index                                    r8             4294967295
+  C                                             rsp + 0x78     None
+  A    index                                    r8             4294967295
+  A    index                                    r8             4294967295
+## func 0x140921a1d  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140921c90  (1 fields)
+  C                                             rsp + 0x68     None
+## func 0x1409223b0  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140922da0  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x1409232e0  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140923b0d  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x14092404d  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140925500  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x140925a40  (1 fields)
+  C                                             rsp + 0x88     None
+## func 0x140926010  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x1409269b0  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x14092751a  (1 fields)
+  A    seed                                     rbx            ?
+## func 0x1409276e4  (1 fields)
+  A    seed                                     rsi            ?
+## func 0x1409285c0  (1 fields)
+  C                                             rsp + 0x78     None
+## func 0x1409293e8  (1 fields)
+  A    fish_uid                                 r13 + 0x738    ?
+## func 0x1409295dd  (1 fields)
+  A    fish_uid                                 r13 + 0x738    ?
+## func 0x140929700  (1 fields)
+  A    fish_uid                                 r8             ?
+## func 0x14093a6c0  (1 fields)
+  D    name                                     rdi            ?
+## func 0x14093a7d0  (2 fields)
+  D    name                                     rdi            ?
+  f32  value                                    rdi + 0x10     0.0
+## func 0x14093a8c0  (2 fields)
+  D    name                                     rsi            ?
+  D    value                                    rsi + 0x10     ?
+## func 0x14093d4d0  (4 fields)
+  B    item                                     rdi            0
+  f32  oxygen                                   rdi + 4        0.0
+  B    uses                                     rdi + 8        0
+  A    vehicle_inventory_id                     rdi + 0x14     0
+## func 0x140959380  (2 fields)
+  A    data_size                                r15 + 0x10     ?
+  A    data_size                                r13 + 0x10     ?
