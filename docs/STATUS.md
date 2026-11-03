@@ -42,6 +42,7 @@ Product direction: `PROJECT_PLAN.md`. This file tracks what is actually done.
 | — | Fluids + pumps | **Recovered (E1):** RE-0010 pressure law, transfer law, pump head. Reference + tests |
 | — | Flooding / waterline | **Pinned as an estimate** (product owner, 2026-11-03): envelope z-scan draft. Shell walk ported (exact on unit cases); the "volume capped" stage and per-face sealing are parked. `buoy_*` definition fields are a debug draw only (E1). Sub-bodies inside hulls add duplicate buoyancy (RE-0004 §8) |
 | — | Electrical | **Recovered (E1):** RE-0011. Battery pool (10-unit window per battery), network charge factor, motor/generator/diode/relay laws. `sim-reference/sw_electric.py` + 5 tests |
+| — | Rudders / fins / control surfaces / keels / wings | **Recovered (E1):** RE-0012. Electric-powered actuator (instant when powered), linear normal-velocity water force with area saturating at 10 (all stock parts equal in water), keel ×40 + righting couple, air path. `sim-reference/sw_rudder.py` |
 | — | Next RE | Torque network + gearbox ratios, `buoy_pipes`/flooding, microcontroller node catalogue (`0x1403698d0`), fluid networks |
 
 ## Recommended order once files arrive

@@ -96,6 +96,7 @@ tests/unit/                         Python tests (reference models, lossless XML
 | RE-0008 | Connections (wired vs physical), pipes, torque network solver, gearboxes, clutches, tick dispatch |
 | RE-0010 | Fluid volumes: pressure law, transfer law, pumps |
 | RE-0011 | Electrical: battery pool, charge factor, motors, generators, relays, diodes, solar |
+| RE-0012 | Rudders, control fins, control surfaces, keels, wings: actuator, water and air forces |
 
 ---
 
