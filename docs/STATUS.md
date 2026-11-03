@@ -33,7 +33,9 @@ Product direction: `PROJECT_PLAN.md`. This file tracks what is actually done.
 | — | Buoyancy volume calibration | Envelope z-scan model: 6/8 sample boats float plausibly. Test pack with predictions sent to the user (barges A, C, D, E, F + round-trip R1/R2) |
 | — | Component transform convention | `r` is column-major (world = rᵀ·v), E1-inferred from voxel-overlap minimisation |
 | — | Air forces | **Recovered (E1):** RE-0005, no air force below 15 m/s. Reference + tests |
-| — | Modular engine cylinder + couplings | **Recovered (E1):** RE-0006. Reference `sw_engine.py` + tests. Torque network/gearbox/propeller next |
+| — | Modular engine cylinder + couplings | **Recovered (E1):** RE-0006. Reference `sw_engine.py` + tests |
+| — | Propellers (force emitters) | **Recovered (E1):** RE-0007, load/thrust law. Absolute magnitudes unverified (blade count/variant flags) |
+| — | Next RE | Torque network + gearbox ratios, `buoy_pipes`/flooding, microcontroller node catalogue (`0x1403698d0`), fluid networks |
 
 ## Recommended order once files arrive
 
