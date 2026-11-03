@@ -115,3 +115,19 @@ openings below the waterline) will be built in `keel-sim`.
 
 `buoy_pipes` (per-voxel 6-bit face mask) appears only on fluid/engine parts (valves = 18 = two opposite faces, many engine
 parts = 63). It most likely marks pipe-through faces, not hull openings.
+
+
+## 5. Compartments and the hole pipeline (from game code, in progress)
+
+- **Debug stages (E1, editor buoyancy view `0x1407a2e40`):** 0 off, 1 cleared stencil, 2 buoyancy hole, 3 cleared holes,
+  4 volume uncapped, 5 volume capped, 6 final. The buoyancy volume is built in stages: a voxel stencil, then explicit hole
+  detection, then hole clearing, then capping.
+- **Compartment creation (builder `0x140489520`, E1):** after the z-scan, opening records come from the scan and from
+  components that bound compartments (`def field_ecc ≤ 1 or = 7`, with their door/hatch normal). For each record whose face is not
+  sealed, the voxel is looked up in a per-voxel compartment index (`body+0x860`). If absent, a 296-byte compartment is allocated
+  (ctor `0x140492810`) into `body+0x848` (the ring the hydro code reads). Its **interior shell** is then traced with the same
+  edge-loop walker on a second surface map (`body+0x668`, `0x14048c440`, `0x1404914c0`).
+- Components with `compartment_sample_pos` are bound to the compartment containing that point (`comp+0x4a8/0x4b0`, `+0x41c/0x420`).
+  Pumps etc. read and write that compartment's fluid. One component kind (`field_ecc == 19`) sets compartment flag `+0x7c`.
+- **Still to decode:** hole detection and capping (stages 2–5) and the per-tick sea-water exchange into compartment containers.
+  Until then, flooding stays an E1 gap (user: open-top hulls sink unless sealed, e.g. with door frames).
