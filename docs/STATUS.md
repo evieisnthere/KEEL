@@ -40,7 +40,7 @@ Product direction: `PROJECT_PLAN.md`. This file tracks what is actually done.
 | — | Torque networks + connections | **Recovered (E1):** RE-0008. Network solver, slot layout, gear ratios, port/pipe connection rules (pipes carry torque and fluid) |
 | — | Drivetrain sim | `sim-reference/sw_drivetrain.py`: topology extraction + 60 Hz ticks. 3556526754: rev-limited 60 RPS, 28.9 kn (waterline assumed). Other ships: topology gaps (connector_torque, pivots, electric motors) |
 | — | Fluids + pumps | **Recovered (E1):** RE-0010 pressure law, transfer law, pump head. Reference + tests |
-| — | Flooding / waterline | Shell walk ported with the game's own adjacency tables (exact on unit cases). Open: the "volume capped" stage for interiors open to the air |
+| — | Flooding / waterline | **Pinned as an estimate** (product owner, 2026-11-03): envelope z-scan draft. Shell walk ported (exact on unit cases); the "volume capped" stage and per-face sealing are parked. `buoy_*` definition fields are a debug draw only (E1). Sub-bodies inside hulls add duplicate buoyancy (RE-0004 §8) |
 | — | Next RE | Torque network + gearbox ratios, `buoy_pipes`/flooding, microcontroller node catalogue (`0x1403698d0`), fluid networks |
 
 ## Recommended order once files arrive

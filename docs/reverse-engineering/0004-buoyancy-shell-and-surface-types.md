@@ -166,3 +166,23 @@ parts = 63). It most likely marks pipe-through faces, not hull openings.
 - User (E2): paintable sign blocks and paintable indicators are fully sealed. This is consistent with definitions (`sign_na`: six
   buoyancy faces, one written without an `orientation` attribute, which defaults to 0). The walk reaching a sign means the
   surrounding cabin is open to the air, not that the sign leaks.
+
+## 8. Status: pinned as an estimate (2026-11-03, product-owner decision)
+
+KEEL currently treats waterline and draft as an **estimate**. They come from the envelope z-scan (`sw_offline.solve_draft`),
+which floats 6 of 8 sample boats plausibly. The exact game model is unfinished and parked: the "volume capped" stage,
+compartment seeds and per-face sealing of open interiors are not yet decoded.
+
+Findings recorded before parking:
+
+* **`buoy_radius` / `buoy_factor` / `buoy_force` (definition +0x83c/+0x840/+0x844) are not physics (E1).** The only reader,
+  `0x14043e0a8`, adds them to a component position and passes both points to `0x1401be220`, the debug line draw
+  (colour 0xffffffff). Almost every definition carries the same 1/1/100, so they are legacy data.
+* **Sub-bodies.** Each physics body (pivot, hinge or turret parts) gets its own shell and buoyancy, scaled by its own
+  body mass (`k_buoy` = 10 below 2000 kg). Sub-bodies that sit inside a sealed hull are counted twice: once as their own
+  shell and again as the hull volume they occupy. This is the user-reported "robotic pivots inside the hull add
+  unnatural buoyancy". With the current shell model the effect is small on the sample ships (+2 to +11 kN, 1–5 % of
+  weight). The amount for a given vehicle depends on the exact sealing model, so KEEL should flag it as a warning rather
+  than rely on it.
+* Main-body sealed volumes from the ported shell model still under-float 5 of 7 ships, so that model is not used for
+  prediction yet.
