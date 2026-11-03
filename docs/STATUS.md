@@ -30,7 +30,7 @@ Product direction: `PROJECT_PLAN.md`. This file tracks what is actually done.
 | — | Simulation plan | **Drafted:** `docs/engineering/simulation-plan.md` |
 | — | Water forces + buoyancy formula | **Recovered (E1):** RE-0003. Reference implementation in `sim-reference/sw_hydro.py`, 6 unit tests passing |
 | — | Surface types, conversion, buoyancy builder | **Recovered (E1):** RE-0004. 58 surface types and the definition→type conversion extracted by emulation. Builder = edge-loop shell walk + z-column scan |
-| — | Buoyancy volume calibration | Blocked on the in-game barge test (or emulating the builder on a real body) |
+| — | Buoyancy volume calibration | Envelope z-scan model: 6/8 sample boats float plausibly. Test pack with predictions sent to the user (barges A, C, D, E, F + round-trip R1/R2) |
 | — | Component transform convention | `r` is column-major (world = rᵀ·v), E1-inferred from voxel-overlap minimisation |
 | — | Air kernel, compartments/flooding, engine | Not started |
 

@@ -113,9 +113,10 @@ def body_shell(components, defs, tables: SurfaceTables):
             vol6 += (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]))
     volume = -float(vol6) / 6.0 * HALF ** 3
     zvol = zscan_volume(kept)
+    env = zscan_volume(kept, envelope=True)
     axis_vols = [zscan_volume(kept, axis=a) for a in (0, 1)]
     return {"polygons": len(kept), "cancelled": cancelled, "unmatched_edges": unmatched,
-            "edge_segments": sum(edges.values()), "volume_closed_m3": volume, "volume_m3": zvol, "volume_xscan_m3": axis_vols[0], "volume_yscan_m3": axis_vols[1]}
+            "edge_segments": sum(edges.values()), "volume_closed_m3": volume, "volume_depth_m3": zvol, "volume_m3": env, "volume_xscan_m3": axis_vols[0], "volume_yscan_m3": axis_vols[1]}
 
 
 def _inward_normal(q):
@@ -136,7 +137,8 @@ def _point_in_poly_xy(px, py, poly):
     return inside
 
 
-def zscan_volume(polys, sub=2, axis=2):
+def zscan_volume(polys, sub=2, axis=2, envelope=False):
+    """envelope=True (default model): inside from first entry to last exit per column (outer envelope; RE-0004 §2b)."""
     """Game-style buoyancy volume (RE-0004 §2b): scan +Z columns, toggle inside on Z-facing surfaces.
     Sub-sampled at 4 points per voxel column (offsets +-0.5 half-voxel units) to avoid hitting quarter-triangle seams.
     A column still 'inside' at the end is extended to the body's z_max + 1 voxel (the game's loop bound)."""
@@ -162,6 +164,12 @@ def zscan_volume(polys, sub=2, axis=2):
     total = 0.0
     for key, hits in cols.items():
         hits.sort()
+        if envelope:
+            ins = [z for z, sg in hits if sg > 0]; outs = [z for z, sg in hits if sg < 0]
+            if ins:
+                zlast = max(outs) if outs and max(outs) > min(ins) else zend
+                total += zlast - min(ins)
+            continue
         depth = 0; zin = None
         for z, sgn in hits:
             prev = depth; depth += sgn

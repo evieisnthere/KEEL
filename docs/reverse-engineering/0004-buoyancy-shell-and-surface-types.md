@@ -54,7 +54,13 @@ top or sides parallel to z don't break buoyancy. This fits open-top boats floati
 Only faces reached by the edge-loop walk (seeded from bottom-facing types) are in the bins, so internal partitions should
 not toggle the state (E1-inferred).
 
-**Reference status:** `sim-reference/sw_buoyancy.py` implements a geometric z-scan (sub-sampled, depth-counting) plus a
+**Envelope model (current default, E1-inferred):** the scan counts empty voxels as inside, so cavities must count. The walk
+therefore only reaches the outer envelope. The reference now uses *first entry → last exit* per z-column. With that,
+6 of 8 workshop boats float at displacement ratios of 0.54–0.82. The other two give 1.15 and 1.39 (hull possibly split across
+bodies, or unmodelled mass). The older depth-counting variant, which excludes cavities, is kept as `volume_depth_m3` for comparison.
+In-game calibration pack: `tools/fixtures/make_test_pack.py` (solid, mass-scaled, hollow and open-top barges with predictions).
+
+**Earlier status:** `sim-reference/sw_buoyancy.py` implements a geometric z-scan (sub-sampled, depth-counting) plus a
 closed-shell check. Unit shapes are exact (block, wedge) or within sampling error (pyramids). On ~30 workshop vehicles, mass
 from definitions vs. this volume gives float ratios of 0.5–2.5. That's inconclusive: the classifier shows most samples are
 trains or cars, and boats are mixed. **Calibration needs the in-game barge test, or emulating the builder on a real body.**
