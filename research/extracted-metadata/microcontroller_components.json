@@ -1,0 +1,722 @@
+{
+ "source": "stormworks64.exe v1.15.26, table built by 0x1403698d0 (emulated); index = microcontroller component 'type' attribute. Long input lists truncated at 6 labels by the dump.",
+ "components": [
+  {
+   "type": 0,
+   "name": "NOT",
+   "desc": "Outputs the logical NOT of its input signal.",
+   "inputs": [
+    "A"
+   ],
+   "outputs": [
+    "NOT A"
+   ]
+  },
+  {
+   "type": 1,
+   "name": "AND",
+   "desc": "Outputs the logical AND of its two input signals.",
+   "inputs": [
+    "A",
+    "B"
+   ],
+   "outputs": [
+    "A AND B"
+   ]
+  },
+  {
+   "type": 2,
+   "name": "OR",
+   "desc": "Outputs the logical OR of its two input signals.",
+   "inputs": [
+    "A",
+    "B"
+   ],
+   "outputs": [
+    "A OR B"
+   ]
+  },
+  {
+   "type": 3,
+   "name": "XOR",
+   "desc": "Outputs the logical XOR of its two input signals.",
+   "inputs": [
+    "A",
+    "B"
+   ],
+   "outputs": [
+    "A XOR B"
+   ]
+  },
+  {
+   "type": 4,
+   "name": "NAND",
+   "desc": "Outputs the logical NAND of its two input signals.",
+   "inputs": [
+    "A",
+    "B"
+   ],
+   "outputs": [
+    "A NAND B"
+   ]
+  },
+  {
+   "type": 5,
+   "name": "NOR",
+   "desc": "Outputs the logical NOR of its two input signals.",
+   "inputs": [
+    "A",
+    "B"
+   ],
+   "outputs": [
+    "A NOR B"
+   ]
+  },
+  {
+   "type": 6,
+   "name": "Add",
+   "desc": "Adds the two input values together and outputs the result.",
+   "inputs": [
+    "A",
+    "B"
+   ],
+   "outputs": [
+    "A + B"
+   ]
+  },
+  {
+   "type": 7,
+   "name": "Subtract",
+   "desc": "Subtracts the second input from the first and outputs the result.",
+   "inputs": [
+    "A",
+    "B"
+   ],
+   "outputs": [
+    "A - B"
+   ]
+  },
+  {
+   "type": 8,
+   "name": "Multiply",
+   "desc": "Multiplies the two input values and outputs the result.",
+   "inputs": [
+    "A",
+    "B"
+   ],
+   "outputs": [
+    "A x B"
+   ]
+  },
+  {
+   "type": 9,
+   "name": "Divide",
+   "desc": "Divides the first input by the second and outputs the result.",
+   "inputs": [
+    "A",
+    "B"
+   ],
+   "outputs": [
+    "A / B",
+    "Divide By Zero"
+   ]
+  },
+  {
+   "type": 10,
+   "name": "f(x, y, z)",
+   "desc": "Evaluates a mathematical expression with up to 3 input variables and outputs the result.",
+   "inputs": [
+    "x",
+    "y",
+    "z"
+   ],
+   "outputs": [
+    "f(x, y, z)"
+   ]
+  },
+  {
+   "type": 11,
+   "name": "Clamp",
+   "desc": "Clamps the input value between a set min and max and outputs the result.",
+   "inputs": [
+    "Input Number"
+   ],
+   "outputs": [
+    "Clamped Input"
+   ]
+  },
+  {
+   "type": 12,
+   "name": "Threshold",
+   "desc": "Outputs an on/off signal indicating whether or not the input value is within a set threshold.",
+   "inputs": [
+    "Input Number"
+   ],
+   "outputs": [
+    "Within Threshold"
+   ]
+  },
+  {
+   "type": 13,
+   "name": "Memory Register",
+   "desc": "Remembers the input value when receiving a signal to the Set node. When the Reset node receives a signal, the stored number is cleared to a value that can be customised in the properties panel.",
+   "inputs": [
+    "Set",
+    "Reset",
+    "Number to store"
+   ],
+   "outputs": [
+    "Stored Number"
+   ]
+  },
+  {
+   "type": 14,
+   "name": "Abs",
+   "desc": "Outputs the absolute value of the input value (negative numbers become positive).",
+   "inputs": [
+    "Input Number"
+   ],
+   "outputs": [
+    "Absolute Value"
+   ]
+  },
+  {
+   "type": 15,
+   "name": "Constant Number",
+   "desc": "Outputs a constant number that is set on the properties panel.",
+   "inputs": [],
+   "outputs": [
+    "Constant Value"
+   ]
+  },
+  {
+   "type": 16,
+   "name": "Constant On Signal",
+   "desc": "Outputs a constant on signal.",
+   "inputs": [],
+   "outputs": [
+    "On Signal"
+   ]
+  },
+  {
+   "type": 17,
+   "name": "Greater Than",
+   "desc": "Outputs an on signal if the first input is greater than the second.",
+   "inputs": [
+    "A",
+    "B"
+   ],
+   "outputs": [
+    "A > B"
+   ]
+  },
+  {
+   "type": 18,
+   "name": "Less Than",
+   "desc": "Outputs an on signal if the first value is less than the second.",
+   "inputs": [
+    "A",
+    "B"
+   ],
+   "outputs": [
+    "A << B"
+   ]
+  },
+  {
+   "type": 19,
+   "name": "Property Slider",
+   "desc": "Adds a custom slider that will be seen on the microcontroller's property panel when placed on a vehicle.",
+   "inputs": [],
+   "outputs": [
+    "Slider Value"
+   ]
+  },
+  {
+   "type": 20,
+   "name": "Property Dropdown",
+   "desc": "Adds a custom dropdown list that will be seen on the microcontroller's property panel when placed on a vehicle.",
+   "inputs": [],
+   "outputs": [
+    "Selected Value"
+   ]
+  },
+  {
+   "type": 21,
+   "name": "Numerical Junction",
+   "desc": "Outputs the input number to one of the outputs depending on whether or not the Switch Signal is on. The path that the input doesn't take will output a value of 0.",
+   "inputs": [
+    "Value To Pass Through",
+    "Switch Signal"
+   ],
+   "outputs": [
+    "On Path",
+    "Off Path"
+   ]
+  },
+  {
+   "type": 22,
+   "name": "Numerical Switchbox",
+   "desc": "Outputs the first input value when receiving an on signal, and the second when receiving an off signal.",
+   "inputs": [
+    "First Value (On)",
+    "Second Value (Off)",
+    "Switch Signal"
+   ],
+   "outputs": [
+    "Switched Value"
+   ]
+  },
+  {
+   "type": 23,
+   "name": "PID Controller",
+   "desc": "A basic PID controller. The proportional, integral and derivative gains can be set in the property panel.",
+   "inputs": [
+    "Setpoint",
+    "Process Variable",
+    "Active"
+   ],
+   "outputs": [
+    "Control Output"
+   ]
+  },
+  {
+   "type": 24,
+   "name": "SR Latch",
+   "desc": "An SR latch that can be set and reset using two on/off inputs.",
+   "inputs": [
+    "Set",
+    "Reset"
+   ],
+   "outputs": [
+    "Output",
+    "NOT Output"
+   ]
+  },
+  {
+   "type": 25,
+   "name": "JK Flip Flop",
+   "desc": "An JK flip flop that can be set and reset using two on/off inputs.",
+   "inputs": [
+    "Set",
+    "Reset"
+   ],
+   "outputs": [
+    "Output",
+    "NOT Output"
+   ]
+  },
+  {
+   "type": 26,
+   "name": "Capacitor",
+   "desc": "Charges up when receiving an on signal, then discharges over a period of time.",
+   "inputs": [
+    "Charge"
+   ],
+   "outputs": [
+    "Stored Charge"
+   ]
+  },
+  {
+   "type": 27,
+   "name": "Blinker",
+   "desc": "Outputs a value that blinks between on and off at a set rate.",
+   "inputs": [
+    "Control Signal"
+   ],
+   "outputs": [
+    "Blinking Signal"
+   ]
+  },
+  {
+   "type": 28,
+   "name": "Push To Toggle",
+   "desc": "An on/off switch that is toggled every time a new on signal is sent to its input.",
+   "inputs": [
+    "Toggle Signal"
+   ],
+   "outputs": [
+    "Internal State"
+   ]
+  },
+  {
+   "type": 29,
+   "name": "Composite Read (on/off)",
+   "desc": "Reads the on/off value from a selected channel of a composite input.",
+   "inputs": [
+    "Composite Signal",
+    "Start Channel"
+   ],
+   "outputs": [
+    "Read Value"
+   ]
+  },
+  {
+   "type": 30,
+   "name": "Composite Write (on/off)",
+   "desc": "Writes an on/off value to a selected channel of the composite input.",
+   "inputs": [
+    "Composite Signal",
+    "Set Value"
+   ],
+   "outputs": [
+    "Modified Composite Signal"
+   ]
+  },
+  {
+   "type": 31,
+   "name": "Composite Read (number)",
+   "desc": "Reads the number value from a selected channel of a composite input.",
+   "inputs": [
+    "Composite Signal",
+    "Start Channel"
+   ],
+   "outputs": [
+    "Read Value"
+   ]
+  },
+  {
+   "type": 32,
+   "name": "Composite Write (number)",
+   "desc": "Writes a number value to a selected channel of the composite input.",
+   "inputs": [
+    "Composite Signal",
+    "Set Value"
+   ],
+   "outputs": [
+    "Modified Composite Signal"
+   ]
+  },
+  {
+   "type": 33,
+   "name": "Property Toggle",
+   "desc": "Adds a custom on/off toggle that will be seen on the microcontroller's property panel when placed on a vehicle.",
+   "inputs": [],
+   "outputs": [
+    "Toggle Value"
+   ]
+  },
+  {
+   "type": 34,
+   "name": "Property Number",
+   "desc": "Adds a custom number input that will be seen on the microcontroller's property panel when placed on a vehicle.",
+   "inputs": [],
+   "outputs": [
+    "Set Number"
+   ]
+  },
+  {
+   "type": 35,
+   "name": "Delta",
+   "desc": "Outputs the difference between the input and the input from the previous tick.",
+   "inputs": [
+    "Input Value"
+   ],
+   "outputs": [
+    "Delta Of Input Value"
+   ]
+  },
+  {
+   "type": 36,
+   "name": "f(x, y, z, w, a, b, c, d)",
+   "desc": "Evaluates a mathematical expression with up to 8 input variables and outputs the result.",
+   "inputs": [
+    "x",
+    "y",
+    "z",
+    "w",
+    "a",
+    "b"
+   ],
+   "outputs": [
+    "f(x, y, z, w, a, b, c, d)"
+   ]
+  },
+  {
+   "type": 37,
+   "name": "Up/Down Counter",
+   "desc": "Has an internal value that will increase and decrease when receiving different signals.",
+   "inputs": [
+    "Up",
+    "Down",
+    "Reset"
+   ],
+   "outputs": [
+    "Value"
+   ]
+  },
+  {
+   "type": 38,
+   "name": "Modulo (fmod)",
+   "desc": "Outputs the modulo of input A by input B.",
+   "inputs": [
+    "A",
+    "B"
+   ],
+   "outputs": [
+    "A % B"
+   ]
+  },
+  {
+   "type": 39,
+   "name": "PID Controller (Advanced)",
+   "desc": "A PID controller with variable proportional, integral and derivative gains.",
+   "inputs": [
+    "Setpoint",
+    "Process Variable",
+    "Proportional Gain",
+    "Integral Gain",
+    "Derivative Gain",
+    "Active"
+   ],
+   "outputs": [
+    "Control Output"
+   ]
+  },
+  {
+   "type": 40,
+   "name": "Composite Write (number)",
+   "desc": "Writes up to 32 numbers to a composite link in a single logic tick. Only connected channels will be modified. The number of inputs and channel to begin writing at can be configured.",
+   "inputs": [
+    "Composite Signal",
+    "Input 1",
+    "Input 2",
+    "Input 3",
+    "Input 4",
+    "Input 5"
+   ],
+   "outputs": [
+    "Modified Composite Signal"
+   ]
+  },
+  {
+   "type": 41,
+   "name": "Composite Write (on/off)",
+   "desc": "Writes up to 32 on/off signals to a composite link in a single logic tick. Only connected channels will be modified. The number of inputs and channel to begin writing at can be configured.",
+   "inputs": [
+    "Composite Signal",
+    "Input 1",
+    "Input 2",
+    "Input 3",
+    "Input 4",
+    "Input 5"
+   ],
+   "outputs": [
+    "Modified Composite Signal"
+   ]
+  },
+  {
+   "type": 42,
+   "name": "Equal",
+   "desc": "Compares whether or not two numbers are equal within a set accuracy.",
+   "inputs": [
+    "A",
+    "B"
+   ],
+   "outputs": [
+    "A = B"
+   ]
+  },
+  {
+   "type": 43,
+   "name": "Tooltip Number",
+   "desc": "Displays a number on this microcontroller's tooltip when it is looked at by the player on a spawned vehicle.",
+   "inputs": [
+    "Display Number",
+    "Is Error"
+   ],
+   "outputs": []
+  },
+  {
+   "type": 44,
+   "name": "Tooltip On/Off",
+   "desc": "Displays an on/off signal on this microcontroller's tooltip when it is looked at by the player on a spawned vehicle.",
+   "inputs": [
+    "Display Signal"
+   ],
+   "outputs": []
+  },
+  {
+   "type": 45,
+   "name": "f(x)",
+   "desc": "Evaluates a mathematical expression with 1 input variable and outputs the result.",
+   "inputs": [
+    "x"
+   ],
+   "outputs": [
+    "f(x)"
+   ]
+  },
+  {
+   "type": 46,
+   "name": "Boolean f(x,y,z,w)",
+   "desc": "Evaluates a logical expression with up to 4 input variables and outputs the result.",
+   "inputs": [
+    "x",
+    "y",
+    "z",
+    "w"
+   ],
+   "outputs": [
+    "f(x,y,z,w)"
+   ]
+  },
+  {
+   "type": 47,
+   "name": "Boolean f(x,y,z,w,a,b,c,d)",
+   "desc": "Evaluates a logical expression with up to 8 input variables and outputs the result.",
+   "inputs": [
+    "x",
+    "y",
+    "z",
+    "w",
+    "a",
+    "b"
+   ],
+   "outputs": [
+    "f(x,y,z,w,a,b,c,d)"
+   ]
+  },
+  {
+   "type": 48,
+   "name": "Pulse (Toggle to Push)",
+   "desc": "A switch that outputs a single tick pulse. It can be configured to pulse when being switched from off to on (default), on to off, or always when the input signal changes.",
+   "inputs": [
+    "Toggle Signal"
+   ],
+   "outputs": [
+    "Pulse"
+   ]
+  },
+  {
+   "type": 49,
+   "name": "Timer (TON)",
+   "desc": "Variable input timer. Outputs an on signal when the timer reaches its duration. The timer will reset when off.",
+   "inputs": [
+    "Timer Enable",
+    "Duration"
+   ],
+   "outputs": [
+    "Timing Complete"
+   ]
+  },
+  {
+   "type": 50,
+   "name": "Timer (TOF)",
+   "desc": "Variable input timer. Outputs an on signal when the timer is less than its duration. The timer will reset when off.",
+   "inputs": [
+    "Timer Enable",
+    "Duration"
+   ],
+   "outputs": [
+    "Timing"
+   ]
+  },
+  {
+   "type": 51,
+   "name": "Timer (RTO)",
+   "desc": "Variable input timer. Outputs an on signal when the timer reaches its duration. The timer will not reset until it is signalled.",
+   "inputs": [
+    "Timer Enable",
+    "Duration",
+    "Reset"
+   ],
+   "outputs": [
+    "Timing Complete"
+   ]
+  },
+  {
+   "type": 52,
+   "name": "Timer (RTF)",
+   "desc": "Variable input timer. Outputs an on signal when the timer is less than its duration. The timer will not reset until it is signalled.",
+   "inputs": [
+    "Timer Enable",
+    "Duration",
+    "Reset"
+   ],
+   "outputs": [
+    "Timing"
+   ]
+  },
+  {
+   "type": 53,
+   "name": "Composite Switchbox",
+   "desc": "Outputs the first input composite when receiving an on signal, and the second when receiving an off signal.",
+   "inputs": [
+    "First Signal (On)",
+    "Second Signal (Off)",
+    "Switch Signal"
+   ],
+   "outputs": [
+    "Switched Signal"
+   ]
+  },
+  {
+   "type": 54,
+   "name": "Number To Composite Binary",
+   "desc": "Converts a number (rounded) to binary and outputs the bits as composite on/off signals.",
+   "inputs": [
+    "Number To Convert"
+   ],
+   "outputs": [
+    "Binary Signal"
+   ]
+  },
+  {
+   "type": 55,
+   "name": "Composite Binary To Number",
+   "desc": "Reads the on/off signals of a composite link and encodes them in the bits of an output number.",
+   "inputs": [
+    "Signal To Convert"
+   ],
+   "outputs": [
+    "Encoded Number"
+   ]
+  },
+  {
+   "type": 56,
+   "name": "Lua Script",
+   "desc": "Runs a custom lua script for advanced logic and drawing to monitors.",
+   "inputs": [
+    "Data Input",
+    "Video Input"
+   ],
+   "outputs": [
+    "Data Output",
+    "Video Output"
+   ]
+  },
+  {
+   "type": 57,
+   "name": "Video Switchbox",
+   "desc": "Outputs the first input video when receiving an on signal, and the second when receiving an off signal.",
+   "inputs": [
+    "Video 1 (On)",
+    "Video 2 (Off)",
+    "Switch Signal"
+   ],
+   "outputs": [
+    "Video Output"
+   ]
+  },
+  {
+   "type": 58,
+   "name": "Property Text",
+   "desc": "Adds a custom text input that will be seen on the microcontroller's property panel when placed on a vehicle, for showing player-defined text within a lua script.",
+   "inputs": [],
+   "outputs": []
+  },
+  {
+   "type": 59,
+   "name": "Audio Switchbox",
+   "desc": "Outputs the first input audio when receiving an on signal, and the second when receiving an off signal.",
+   "inputs": [
+    "Audio 1 (On)",
+    "Audio 2 (Off)",
+    "Switch Signal"
+   ],
+   "outputs": [
+    "Audio Output"
+   ]
+  }
+ ]
+}

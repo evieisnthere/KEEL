@@ -27,7 +27,8 @@ What exists today:
 | Drivetrains | Port/pipe connection rules, the torque-network solver and gear ratios (RE-0008). Drivetrains are extracted from vehicle files and simulated at 60 Hz |
 | Fluids & electrical | Pressure/transfer/pump laws (RE-0010); battery pool, motors, generators (RE-0011) |
 | Waterline | **Estimate** for now (envelope z-scan). The exact game flooding model is parked (RE-0004 §8) |
-| In progress | Logic/microcontrollers, rudders and remaining components, then a full 6-DOF boat simulation driven by the boat's own controls |
+| Logic & steering | Microcontroller format, catalogue and tick semantics (RE-0013); rudders, fins, control surfaces and keels (RE-0012) |
+| Next | Phase 1: the Rust application |
 
 A first end-to-end result: the workshop boat 3556526754 ("Your Boat", two 12-cylinder modular engines, 3:1 gearboxes, two
 propellers) simulated purely from its file reaches **28.9 kn, limited by the 3600 RPM rev limiter**. Its waterline is
@@ -97,6 +98,7 @@ tests/unit/                         Python tests (reference models, lossless XML
 | RE-0010 | Fluid volumes: pressure law, transfer law, pumps |
 | RE-0011 | Electrical: battery pool, charge factor, motors, generators, relays, diodes, solar |
 | RE-0012 | Rudders, control fins, control surfaces, keels, wings: actuator, water and air forces |
+| RE-0013 | Microcontrollers: XML format, 60-component catalogue, execution order, component behaviours |
 
 ---
 
