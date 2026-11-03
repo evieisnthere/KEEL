@@ -70,3 +70,9 @@ Each fixture gets a small vehicle XML in `tests/fixtures/in-game/` once the vehi
 - Bullet damping is applied per step, so if the step rate is wrong every speed prediction is off by a constant factor.
   Pin the step rate down early.
 - Reimplement from documented equations. Do not copy decompiled code into the product. RE notes record the equations and constants.
+
+
+## Calibration references (E3, user-reported)
+- Stormworks boats typically run **2–3× faster** than their real-world counterparts. A speedboat has reached about **110 kn**.
+- The workshop "Lagoon 400" (3556526754, real-world ~8–9 kn under power) is simulated at 28.9 kn rev-limited with an assumed waterline,
+  which sits at the high end of that band.

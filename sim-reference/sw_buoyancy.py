@@ -397,3 +397,187 @@ def game_buoyancy(components, defs, tables: SurfaceTables):
     return {"buoyant_m3": env - open_m3, "envelope_m3": env, "open_compartments": int(len(open_labels)),
             "sealed_compartments": int(n - len(open_labels)), "flooded_m3": open_m3,
             "sealed_air_m3": float((empty_inside & ~open_mask).sum()) * vox}
+
+
+def game_flooded_buoyancy(components, defs, tables: SurfaceTables, sub=2):
+    """Game-structured static waterline volume (RE-0004 §5, voxel + face granularity):
+      inside      : voxel centre lies inside the envelope z-scan of its column (polygon scan, as the game's finish step)
+      face block  : a voxel face is sealed when buoyancy surfaces cover its full area (full face or quarter triangles)
+      compartment : 6-connected *empty* inside voxels joined through unsealed faces
+      hole        : a compartment touching (through an unsealed face) a voxel that is not inside → it floods ("cleared")
+      buoyant     : envelope volume − volume of cleared compartments
+    """
+    import numpy as np, collections as C
+    from scipy import ndimage
+    polys, cover = [], C.defaultdict(float); occ = set(); comp_vox = set(); vcache = {}
+    for d, vp, R in components:
+        r = defs.get(d)
+        if r is None:
+            continue
+        if d not in vcache:
+            vs = [tuple(int(float(p.get(a, 0) or 0)) for a in 'xyz') for p in (v.find('position') for v in r.find('voxels')) if p is not None]
+            vcache[d] = vs or [(0, 0, 0)]
+        for q in vcache[d]:
+            w = rot_col(R, q); comp_vox.add((vp[0] + w[0], vp[1] + w[1], vp[2] + w[2]))
+        bs = r.find('buoyancy_surfaces')
+        if bs is None:
+            continue
+        for s in bs:
+            p = s.find('position')
+            sp = tuple(int(float(p.get(a, 0) or 0)) for a in 'xyz') if p is not None else (0, 0, 0)
+            wpos = rot_col(R, sp); centre = tuple(2 * (vp[i] + wpos[i]) for i in range(3))
+            for t in tables.types_for(s.get('orientation', '0'), s.get('rotation', '0'), s.get('shape', '0')):
+                poly = [tuple(centre[i] + q[i] for i in range(3)) for q in (rot_col(R, v) for v in tables.poly[t])]
+                polys.append(poly)
+                k = _face_key(poly)
+                if k:
+                    cover[k] += _poly_area_half2(poly)
+                else:   # slope / diagonal surface cuts this voxel: it is a sealed boundary voxel for flooding
+                    cx = sum(v[0] for v in poly) / len(poly); cy = sum(v[1] for v in poly) / len(poly); cz = sum(v[2] for v in poly) / len(poly)
+                    occ.add((int((cx + 1) // 2), int((cy + 1) // 2), int((cz + 1) // 2)))
+    if not comp_vox:
+        return {"buoyant_m3": 0.0}
+    blocked = {k for k, a in cover.items() if a >= 4.0 - 1e-6}
+    # per-face sealing (user/E1): water passes through any voxel, occupied or not, unless the shared face is covered by
+    # buoyancy surfaces. Voxels cut by slope surfaces act as boundary voxels. A voxel sealed on all six faces is solid.
+    for v in comp_vox:
+        if all(((ax, v, tuple(v[i] + (1 if i == ax else 0) for i in range(3))) in blocked and
+                (ax, tuple(v[i] - (1 if i == ax else 0) for i in range(3)), v) in blocked) for ax in range(3)):
+            occ.add(v)
+    O = np.array(sorted(occ | comp_vox)); lo = O.min(0) - 1; hi = O.max(0) + 1
+    shape = tuple(int(x) for x in hi - lo + 1)
+    occg = np.zeros(shape, bool)
+    if occ:
+        W = np.array(sorted(occ)); j = W - lo; occg[j[:, 0], j[:, 1], j[:, 2]] = True   # walls: sealed or slope-cut voxels
+    # inside: envelope interval per voxel column from the polygon z-scan (sampled just off the column centre)
+    hits = C.defaultdict(list)
+    for p in polys:
+        n = _inward_normal(p)
+        if n[2] == 0:
+            continue
+        xs = [v[0] for v in p]; ys = [v[1] for v in p]
+        for vx in range((min(xs) + 1) // 2, (max(xs) + 1) // 2 + 1):
+            for vy in range((min(ys) + 1) // 2, (max(ys) + 1) // 2 + 1):
+                px, py = 2 * vx + 0.137, 2 * vy + 0.113
+                if _point_in_poly_xy(px, py, p):
+                    a = p[0]; z = a[2] - (n[0] * (px - a[0]) + n[1] * (py - a[1])) / n[2]
+                    hits[(vx, vy)].append((z, 1 if n[2] > 0 else -1))
+    inside = np.zeros(shape, bool)
+    for (vx, vy), hs in hits.items():
+        ins = [z for z, s in hs if s > 0]; outs = [z for z, s in hs if s < 0]
+        if not ins:
+            continue
+        z0 = min(ins); z1 = max(outs) if outs and max(outs) > z0 else 2 * hi[2] + 2
+        ix, iy = vx - lo[0], vy - lo[1]
+        if not (0 <= ix < shape[0] and 0 <= iy < shape[1]):
+            continue
+        for vz in range(lo[2], hi[2] + 1):
+            if z0 < 2 * vz < z1:
+                inside[ix, iy, vz - lo[2]] = True
+    empty_in = inside & ~occg
+    # label compartments through unsealed faces (union-find over face adjacency)
+    idx = {tuple(int(c) for c in v): i for i, v in enumerate(np.argwhere(empty_in))}
+    parent = list(range(len(idx)))
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]; a = parent[a]
+        return a
+    holed = set(); leaks = []
+    for v, i in idx.items():
+        wv = (v[0] + lo[0], v[1] + lo[1], v[2] + lo[2])
+        for ax in range(3):
+            for dl in (-1, 1):
+                nv = list(v); nv[ax] += dl; nv = tuple(nv)
+                nw = (nv[0] + lo[0], nv[1] + lo[1], nv[2] + lo[2])
+                key = (ax, wv, nw) if dl == 1 else (ax, nw, wv)
+                if key in blocked:
+                    continue
+                if nv in idx:
+                    parent[find(i)] = find(idx[nv])
+                elif not (0 <= nv[0] < shape[0] and 0 <= nv[1] < shape[1] and 0 <= nv[2] < shape[2]) or not inside[nv] and not occg[nv]:
+                    holed.add(i); leaks.append((wv, nw))
+    holed_roots = {find(i) for i in holed}
+    groups = C.Counter(find(i) for i in idx.values())
+    cleared = sum(n for r, n in groups.items() if r in holed_roots)
+    vox = 0.25 ** 3
+    env = zscan_volume(polys, envelope=True)
+    return {"buoyant_m3": env - cleared * vox, "envelope_m3": env, "compartments": len(groups),
+            "holed_compartments": len(holed_roots), "cleared_m3": cleared * vox,
+            "sealed_air_m3": (len(idx) - cleared) * vox, "_leaks": leaks, "_occ": occ}
+
+
+def shell_buoyancy(components, defs, tables: SurfaceTables, sub=2):
+    """Shell-based watertight buoyancy, following the game's structure (RE-0004 §2, §5):
+      1. place all buoyancy surfaces; cancel back-to-back coincident faces (internal walls between blocks)
+      2. split the remaining surfaces into shells = components connected through shared edges
+      3. outer shells = shells not enclosed by another shell (the game walks these first; the z-scan uses them)
+         inner shells = interior compartments; closed → sealed air (stays buoyant), open → "buoyancy hole" (cleared)
+      4. buoyant volume = parity z-scan over outer-shell faces (an open-top hull's inner faces belong to the outer shell,
+         so its cavity is not counted, which is why open-top boats sink) − volumes of open inner shells
+    """
+    import collections as C
+    polys = []
+    for d, vp, R in components:
+        r = defs.get(d)
+        if r is None or r.find('buoyancy_surfaces') is None:
+            continue
+        for s in r.find('buoyancy_surfaces'):
+            p = s.find('position')
+            sp = tuple(int(float(p.get(a, 0) or 0)) for a in 'xyz') if p is not None else (0, 0, 0)
+            wpos = rot_col(R, sp); centre = tuple(2 * (vp[i] + wpos[i]) for i in range(3))
+            for t in tables.types_for(s.get('orientation', '0'), s.get('rotation', '0'), s.get('shape', '0')):
+                for tt in (tables.quarters[t] if t < 6 else [t]):
+                    polys.append([tuple(centre[i] + q[i] for i in range(3)) for q in (rot_col(R, v) for v in tables.poly[tt])])
+    groups = C.defaultdict(list)
+    for p in polys:
+        groups[frozenset(p)].append(p)
+    kept = []
+    for ps in groups.values():
+        fwd = [p for p in ps if _winding_sign(p, ps[0]) > 0]; rev = [p for p in ps if _winding_sign(p, ps[0]) < 0]
+        k = min(len(fwd), len(rev)); kept += fwd[k:] + rev[k:]
+    # shells via shared undirected unit edges
+    parent = list(range(len(kept)))
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]; a = parent[a]
+        return a
+    edge_owner = {}; segs = []
+    for i, p in enumerate(kept):
+        q = _split_edges(p); es = [(q[k], q[(k + 1) % len(q)]) for k in range(len(q))]; segs.append(es)
+        for a, b in es:
+            key = (a, b) if a <= b else (b, a)
+            if key in edge_owner:
+                parent[find(i)] = find(edge_owner[key])
+            else:
+                edge_owner[key] = i
+    shells = C.defaultdict(list)
+    for i in range(len(kept)):
+        shells[find(i)].append(i)
+    info = []
+    for root, idxs in shells.items():
+        dir_edges = C.Counter(e for i in idxs for e in segs[i])
+        open_edges = sum(max(0, n - dir_edges.get((b, a), 0)) for (a, b), n in dir_edges.items())
+        vol6 = 0.0
+        for i in idxs:
+            p = kept[i]
+            for k in range(1, len(p) - 1):
+                a, b, c = p[0], p[k], p[k + 1]
+                vol6 += a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])
+        lo = tuple(min(kept[i][j][ax] for i in idxs for j in range(len(kept[i]))) for ax in range(3))
+        hi = tuple(max(kept[i][j][ax] for i in idxs for j in range(len(kept[i]))) for ax in range(3))
+        info.append(dict(idxs=idxs, open_edges=open_edges, volume=-vol6 / 6.0 * HALF ** 3, lo=lo, hi=hi))
+    # outer vs inner: a shell whose bounding box lies strictly inside another shell's bounding box and whose signed volume
+    # is negative (faces point into the cavity) is an interior compartment
+    info.sort(key=lambda s: -(s['hi'][0] - s['lo'][0]) * (s['hi'][1] - s['lo'][1]) * (s['hi'][2] - s['lo'][2]))
+    outer, inner = [], []
+    for s in info:
+        enclosed = any(o is not s and all(o['lo'][a] <= s['lo'][a] and s['hi'][a] <= o['hi'][a] for a in range(3)) for o in outer)
+        (inner if enclosed and s['volume'] < 0 else outer).append(s)
+    outer_polys = [kept[i] for s in outer for i in s['idxs']]
+    v_outer = zscan_volume(outer_polys, sub=sub)          # parity (depth) scan over outer-shell faces
+    cleared = sum(-s['volume'] for s in inner if s['open_edges'] > 0)
+    sealed = sum(-s['volume'] for s in inner if s['open_edges'] == 0)
+    return {"buoyant_m3": v_outer - cleared, "outer_scan_m3": v_outer, "outer_shells": len(outer),
+            "inner_sealed": sum(1 for s in inner if s['open_edges'] == 0), "inner_holed": sum(1 for s in inner if s['open_edges'] > 0),
+            "sealed_air_m3": sealed, "cleared_m3": cleared,
+            "outer_open_edges": sum(s['open_edges'] for s in outer)}

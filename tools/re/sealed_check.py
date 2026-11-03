@@ -20,6 +20,6 @@ for p in sys.argv[3:]:
     bid, comps = max(bodies, key=lambda b: sum(mass.get(d, 0) for d, _, _ in b[1]))
     M = sum(mass.get(d, 0) for d, _, _ in comps); k = H.buoyancy_divisor(M)
     import time; t0 = time.time()
-    r = B.game_buoyancy(comps, defs, T)
+    r = B.shell_buoyancy(comps, defs, T)
     V = r['buoyant_m3']; ratio = M * k / (1000 * V) if V else float('inf')
-    print(f"{os.path.basename(os.path.dirname(p))} {kind:5s} M={M:8.0f} sealed={V:8.2f} m3 sealed_air={r.get('sealed_air_m3', 0):.1f} flooded={r.get('flooded_m3',0):.1f} open/sealed comps={r.get('open_compartments')}/{r.get('sealed_compartments')} ({time.time()-t0:.0f}s) ratio={ratio:.2f} {'floats' if ratio < 1 else 'SINKS'}")
+    print(f"{os.path.basename(os.path.dirname(p))} {kind:5s} M={M:8.0f} sealed={V:8.2f} m3 outer={r.get('outer_shells')} sealed_air={r.get('sealed_air_m3', 0):.1f} ({r.get('inner_sealed')} rooms) cleared={r.get('cleared_m3',0):.1f} ({r.get('inner_holed')} holed) outer_open_edges={r.get('outer_open_edges')} ({time.time()-t0:.0f}s) ratio={ratio:.2f} {'floats' if ratio < 1 else 'SINKS'}")

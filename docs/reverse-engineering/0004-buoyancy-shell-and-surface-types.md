@@ -131,3 +131,22 @@ parts = 63). It most likely marks pipe-through faces, not hull openings.
   Pumps etc. read and write that compartment's fluid. One component kind (`field_ecc == 19`) sets compartment flag `+0x7c`.
 - **Still to decode:** hole detection and capping (stages 2–5) and the per-tick sea-water exchange into compartment containers.
   Until then, flooding stays an E1 gap (user: open-top hulls sink unless sealed, e.g. with door frames).
+
+
+## 6. Watertightness model: findings so far (2026-11-03)
+
+- **Sealing is per face, per voxel** (user, confirmed by definitions): only faces covered by `buoyancy_surfaces` stop water. Occupied
+  voxels without surfaces (seats, displays, microcontrollers, pipes) do not. `door_frame_straight` has all six faces → seals a gap.
+  Voxel `flags` are collision flags (0 seats/rotors, 4 doors…), not sealing.
+- **Structure (E1):** the finish step records an empty inside voxel only where the neighbour already carries a surface on the shared
+  face. Those are compartment walls, and they seed an interior shell walk. So watertightness is **shell closure at surface level**:
+  - the first-walked (outer) shell defines the z-scan buoyancy volume;
+  - other shells are compartments: closed → sealed air (buoyant), open → "buoyancy hole" → cleared;
+  - an open-top hull's inner faces join its outer shell over the rim, so the cavity is never counted. That is why open-top boats sink.
+- `sw_buoyancy.shell_buoyancy` implements this with edge pairing. All unit cases are exact (closed / open-top / door-frame-capped /
+  solid), but real hulls show thousands of open edges at **non-manifold junctions** (block faces meeting 2:1 / 4:1 slope pieces,
+  windows, signs), where simple pairing cannot pick the continuation.
+- The game resolves junctions with **ordered per-edge candidate lists**, dumped by emulation to
+  `research/extracted-metadata/surface_adjacency.json`: 45 lists × 12 candidates `(order, dx, dy, dz, neighbour edge id, neighbour
+  surface type)`. Edge ids follow `6·m + face`. **Next:** port `0x140488260` (walk step) and `0x140488d20` (z-scan) exactly on top of
+  these lists, then re-run the boats.
