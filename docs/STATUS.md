@@ -8,6 +8,7 @@
 - `rom/meshes` received (component meshes, 1497 files). Never committed.
 - Hull optimisers target **realistic real-world hulls**. The Stormworks model is a prediction or optional constraint by default. An opt-in "Stormworks-optimised" mode is allowed, behind an explicit unrealistic-results warning.
 - Work continuously; report at milestones, don't pause to ask.
+- Goal (user): exact 60 Hz simulation of a boat driven by its own throttle lever/helm (logic clock 60 Hz, user-confirmed). Flooding to be derived from game code, not guessed.
 - In-game calibration: occasional, not before a few days from now. Prefer static evidence and batch fixtures.
 
 Product direction: `PROJECT_PLAN.md`. This file tracks what is actually done.
@@ -36,6 +37,8 @@ Product direction: `PROJECT_PLAN.md`. This file tracks what is actually done.
 | — | Air forces | **Recovered (E1):** RE-0005, no air force below 15 m/s. Reference + tests |
 | — | Modular engine cylinder + couplings | **Recovered (E1):** RE-0006. Reference `sw_engine.py` + tests |
 | — | Propellers (force emitters) | **Recovered (E1):** RE-0007, load/thrust law. Absolute magnitudes unverified (blade count/variant flags) |
+| — | Torque networks + connections | **Recovered (E1):** RE-0008. Network solver, slot layout, gear ratios, port/pipe connection rules (pipes carry torque and fluid) |
+| — | Drivetrain sim | `sim-reference/sw_drivetrain.py`: topology extraction + 60 Hz ticks. 3556526754: rev-limited 60 RPS, 28.9 kn (waterline assumed). Other ships: topology gaps (connector_torque, pivots, electric motors) |
 | — | Next RE | Torque network + gearbox ratios, `buoy_pipes`/flooding, microcontroller node catalogue (`0x1403698d0`), fluid networks |
 
 ## Recommended order once files arrive

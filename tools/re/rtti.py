@@ -15,7 +15,7 @@ def vtables(cls):
         while k >= 0:
             vt = k + 8; offs = struct.unpack_from('<I', img, c + 4)[0]
             fns = []
-            for n in range(80):
+            for n in range(int(__import__("os").environ.get("VSLOTS","80"))):
                 f = struct.unpack_from('<Q', img, vt + 8 * n)[0]
                 if not (base + 0x1000 <= f < base + 0xa96000): break
                 fns.append(f)
