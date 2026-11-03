@@ -58,6 +58,14 @@ vehicle[data_version, bodies_id]
 `src/keel_io/losslessxml.py` + `src/keel_io/vehicle.py`: **all 850 sample files (164 MB) round-trip byte-identically**,
 including playlists and all 759 non-standard definition files. Edits re-serialise only the touched element (unit-tested).
 
+## Mesh files (`rom/meshes/*.mesh`, E1 from inspection)
+
+Reader: `src/keel_io/mesh.py`. **1497/1497** supplied meshes parse with a consistent 2-byte trailer.
+`'mesh'`, u16 version 7, u16 1, u16 vertex_count, u16 0x13, u16 0. Then vertices of 28 bytes: pos f32×3 (metres, component frame),
+RGBA u8×4, normal f32×3. Then u32 index_count + u16 indices (triangle list). Then u16 submesh_count, and per submesh: u32 index_start,
+u32 index_count, u32 shader (two u16 values packed), bbox f32×6, u16, u16 name_len, name (e.g. "ID20"), tint f32×3.
+Structural blocks (wedges, pyramids…) have **no mesh**. They are drawn from their surfaces, which KEEL already decodes.
+
 ## Next
 
 1. Coordinate convention: compare `vp` and `r` against definition voxel extents on a few known shapes.

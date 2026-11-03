@@ -95,3 +95,23 @@ The meaning of the gas term (gas beyond 1/60 of capacity adds weight) is unclear
 1. Map definition `surface(orientation, rotation, shape)` to sets of the 58 types (compare definition surfaces with the static
    edge table, or find the converter used by `0x140486db0`).
 2. Decode the volume/octree weighting and the `buoy_pipes` behaviour.
+
+
+## 4. Watertightness and flooding: status (2026-11-03)
+
+**In-game behaviour (user, E2):** open-topped boats sink; the hull must be watertight. A door-frame block can make a
+"semi-sealed" gap. Definitions confirm the mechanism: `door_frame_straight` has **six full buoyancy faces** (a sealed cube in
+buoyancy terms), while e.g. `window_1x1` has only its single panel face.
+
+Static models tried in `sim-reference/sw_buoyancy.py` (all correct on unit boxes: closed box sealed, open-top floods, door frames reseal):
+1. `sealed_volume` (voxel-face flood): leaks through voxels split by slopes.
+2. `sealed_volume_fine` (sub-voxel wall rasterisation, scipy labelling): ±0.2–2 % on box structures.
+3. `game_buoyancy` (game structure: z-scan inside, compartments = empty inside voxels, open = touches outside air).
+
+On 8 workshop boats these models disagree, and most predict sinking. Likely causes: true openings that only flood up to the
+external water level (dynamic, not static), multi-body hulls, and components without buoyancy surfaces. **Static flooding is
+parked until in-game data** (test pack barges E/F). The dynamic flooding model (water level per compartment, inflow through
+openings below the waterline) will be built in `keel-sim`.
+
+`buoy_pipes` (per-voxel 6-bit face mask) appears only on fluid/engine parts (valves = 18 = two opposite faces, many engine
+parts = 63). It most likely marks pipe-through faces, not hull openings.
