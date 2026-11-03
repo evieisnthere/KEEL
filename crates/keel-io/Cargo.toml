@@ -1,0 +1,8 @@
+[package]
+name = "keel-io"
+description = "Lossless Stormworks XML and mesh I/O for KEEL"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]

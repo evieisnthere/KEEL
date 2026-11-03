@@ -4,7 +4,8 @@
 
 - Game definitions (`rom/data/definitions`) will be supplied. Game version: **v1.15.26**. `rom/meshes` is too large to send; the preview is built from voxels.
 - Simulation priority: a **game-accurate replica** (keep decompiling the drag, buoyancy and engine code).
-- Platforms: **Windows and Linux**, driven by one `build.sh` that installs or bootstraps the toolchain (vcpkg for Qt 6 + OCCT).
+- Platforms: **Windows and Linux**, driven by one `build.sh`. **Stack changed to Rust** (ADR-0001), so `build.sh` bootstraps rustup.
+- `rom/meshes` received (component meshes, 1497 files). Never committed.
 - Hull optimisers target **realistic real-world hulls**. The Stormworks model is a prediction or optional constraint by default. An opt-in "Stormworks-optimised" mode is allowed, behind an explicit unrealistic-results warning.
 - Work continuously; report at milestones, don't pause to ask.
 - In-game calibration: occasional, not before a few days from now. Prefer static evidence and batch fixtures.
@@ -16,13 +17,13 @@ Product direction: `PROJECT_PLAN.md`. This file tracks what is actually done.
 | # | Task (plan §19) | Status |
 |---|---|---|
 | 1 | Inspect dev environment | Done for the cloud container: gcc, cmake, Java 21, Python 3.13, **no Qt 6 / OCCT**, GitHub downloads blocked. The real build target (user's machine) is still unknown |
-| 2 | ADR: Qt 6 + OCCT vs alternatives | Not started. Blocked on the target OS/toolchain |
+| 2 | ADR: stack | **Done:** ADR-0001 Rust (egui/wgpu; geometry kernel spike truck vs opencascade-rs pending) |
 | 3 | Request and inventory reference vehicles | **Done:** about 70 vehicles and 25 MCs received (RE-0002) |
 | 3a | Inventory game binaries | **Done:** RE-0001 |
 | 3b | Game data files (definitions, meshes) | Definitions received (759). Meshes too large; preview from voxels instead |
 | 4 | XML structure report | First pass done (RE-0002) |
 | 5 | Smallest round-trip fixture | Candidate: `3607751095` (174 comps, 1 body, includes 3 MCs) |
-| 6 | Lossless parser | **Done:** `src/keel_io`. 850/850 sample files byte-identical, local edits tested |
+| 6 | Lossless parser | **Done** in Python (`src/keel_io`) and **Rust** (`crates/keel-io`). 850/850 XML byte-identical, 1497/1497 meshes parse |
 | 7 | Vehicle model + coordinate tests | Model done (`keel_io.vehicle`). Axes: Y up, Z fore–aft (E1-inferred) |
 | 8 | Viewport prototype | Not started |
 | 9 | No-op round-trip export | Implemented. In-game load test pending (user) |
