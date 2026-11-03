@@ -1,0 +1,320 @@
+//! Editable vehicle on top of the lossless XML tree. Every edit touches only the elements it changes, so unknown data
+//! survives (plan exit criterion). Undo/redo snapshots the document (vehicles are at most a few MB).
+use keel_io::vehicle::IDENTITY;
+use keel_io::xml::{self, Document, Element, Node};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct CompId {
+    pub body: usize,
+    pub comp: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct CompInfo {
+    pub def: String,
+    pub voxel: [i32; 3],
+    pub rotation: [i32; 9],
+    pub sc: Option<String>,
+}
+
+pub struct Model {
+    pub doc: Document,
+    undo: Vec<Document>,
+    redo: Vec<Document>,
+    pub generation: u64,
+    pub dirty: bool,
+}
+
+const UNDO_LIMIT: usize = 200;
+
+fn v3(e: Option<&Element>) -> [i32; 3] {
+    let mut v = [0; 3];
+    if let Some(e) = e {
+        for (i, a) in ["x", "y", "z"].iter().enumerate() {
+            v[i] = e.get(a).and_then(|s| s.trim().parse::<f64>().ok()).map(|f| f.round() as i32).unwrap_or(0);
+        }
+    }
+    v
+}
+
+fn rot_of(o: &Element) -> [i32; 9] {
+    o.get("r")
+        .and_then(|s| {
+            let v: Vec<i32> = s.split(',').filter_map(|x| x.trim().parse().ok()).collect();
+            (v.len() == 9).then(|| {
+                let mut r = [0; 9];
+                r.copy_from_slice(&v);
+                r
+            })
+        })
+        .unwrap_or(IDENTITY)
+}
+
+/// M[i][j] = r[3j + i]; world = M·v (keel_io::vehicle::rotate).
+fn mat(r: &[i32; 9]) -> [[i32; 3]; 3] {
+    let mut m = [[0; 3]; 3];
+    for i in 0..3 {
+        for j in 0..3 {
+            m[i][j] = r[3 * j + i];
+        }
+    }
+    m
+}
+fn unmat(m: &[[i32; 3]; 3]) -> [i32; 9] {
+    let mut r = [0; 9];
+    for i in 0..3 {
+        for j in 0..3 {
+            r[3 * j + i] = m[i][j];
+        }
+    }
+    r
+}
+fn mul(a: &[[i32; 3]; 3], b: &[[i32; 3]; 3]) -> [[i32; 3]; 3] {
+    let mut m = [[0; 3]; 3];
+    for i in 0..3 {
+        for j in 0..3 {
+            m[i][j] = (0..3).map(|k| a[i][k] * b[k][j]).sum();
+        }
+    }
+    m
+}
+/// +90° about axis 0 = X, 1 = Y, 2 = Z (right-handed).
+pub fn quarter_turn(axis: usize) -> [[i32; 3]; 3] {
+    match axis {
+        0 => [[1, 0, 0], [0, 0, -1], [0, 1, 0]],
+        1 => [[0, 0, 1], [0, 1, 0], [-1, 0, 0]],
+        _ => [[0, -1, 0], [1, 0, 0], [0, 0, 1]],
+    }
+}
+
+fn set_vec(o: &mut Element, tag: &str, v: [i32; 3]) {
+    if o.find(tag).is_none() {
+        if v == [0, 0, 0] {
+            return;
+        }
+        o.push(Element::new(tag));
+    }
+    let e = o.find_mut(tag).unwrap();
+    for (i, a) in ["x", "y", "z"].iter().enumerate() {
+        if v[i] == 0 {
+            e.remove_attr(a);
+        } else {
+            e.set(a, &v[i].to_string());
+        }
+    }
+}
+
+impl Model {
+    pub fn from_document(doc: Document) -> Result<Self, String> {
+        if doc.root.tag != "vehicle" {
+            return Err(format!("not a vehicle file (root <{}>)", doc.root.tag));
+        }
+        Ok(Model { doc, undo: vec![], redo: vec![], generation: 0, dirty: false })
+    }
+    pub fn parse(src: &str) -> Result<Self, String> {
+        Self::from_document(xml::parse(src).map_err(|e| e.to_string())?)
+    }
+    pub fn new_empty() -> Self {
+        Self::parse("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<vehicle data_version=\"3\" bodies_id=\"1\">\n<authors/>\n<bodies>\n<body unique_id=\"0\">\n<components>\n</components>\n</body>\n</bodies>\n<logic_node_links/>\n</vehicle>\n").unwrap()
+    }
+    pub fn to_xml(&self) -> String {
+        self.doc.to_string_lossless()
+    }
+
+    fn bodies(&self) -> Vec<&Element> {
+        self.doc.root.find("bodies").map(|b| b.elements().filter(|e| e.tag == "body").collect()).unwrap_or_default()
+    }
+    pub fn body_count(&self) -> usize {
+        self.bodies().len()
+    }
+    pub fn components(&self) -> Vec<(CompId, CompInfo)> {
+        let mut out = Vec::new();
+        for (bi, b) in self.bodies().iter().enumerate() {
+            if let Some(cs) = b.find("components") {
+                for (ci, c) in cs.elements().filter(|e| e.tag == "c").enumerate() {
+                    let Some(o) = c.find("o") else { continue };
+                    out.push((
+                        CompId { body: bi, comp: ci },
+                        CompInfo {
+                            def: c.get("d").unwrap_or_else(|| "01_block".into()),
+                            voxel: v3(o.find("vp")),
+                            rotation: rot_of(o),
+                            sc: o.get("sc"),
+                        },
+                    ));
+                }
+            }
+        }
+        out
+    }
+    pub fn component_element(&self, id: CompId) -> Option<&Element> {
+        self.bodies().get(id.body)?.find("components")?.elements().filter(|e| e.tag == "c").nth(id.comp)
+    }
+    fn components_el_mut(&mut self, body: usize) -> Option<&mut Element> {
+        self.doc.root.find_mut("bodies")?.elements_mut().filter(|e| e.tag == "body").nth(body)?.find_mut("components")
+    }
+    fn comp_mut(&mut self, id: CompId) -> Option<&mut Element> {
+        self.components_el_mut(id.body)?.elements_mut().filter(|e| e.tag == "c").nth(id.comp)
+    }
+
+    // ---- history -------------------------------------------------------------------------------------------------
+    fn checkpoint(&mut self) {
+        self.undo.push(self.doc.clone());
+        if self.undo.len() > UNDO_LIMIT {
+            self.undo.remove(0);
+        }
+        self.redo.clear();
+        self.generation += 1;
+        self.dirty = true;
+    }
+    pub fn can_undo(&self) -> bool {
+        !self.undo.is_empty()
+    }
+    pub fn can_redo(&self) -> bool {
+        !self.redo.is_empty()
+    }
+    pub fn undo(&mut self) -> bool {
+        match self.undo.pop() {
+            Some(d) => {
+                self.redo.push(std::mem::replace(&mut self.doc, d));
+                self.generation += 1;
+                self.dirty = true;
+                true
+            }
+            None => false,
+        }
+    }
+    pub fn redo(&mut self) -> bool {
+        match self.redo.pop() {
+            Some(d) => {
+                self.undo.push(std::mem::replace(&mut self.doc, d));
+                self.generation += 1;
+                self.dirty = true;
+                true
+            }
+            None => false,
+        }
+    }
+
+    // ---- edits ---------------------------------------------------------------------------------------------------
+    pub fn translate(&mut self, ids: &[CompId], d: [i32; 3]) {
+        if ids.is_empty() || d == [0, 0, 0] {
+            return;
+        }
+        self.checkpoint();
+        for &id in ids {
+            if let Some(o) = self.comp_mut(id).and_then(|c| c.find_mut("o")) {
+                let v = v3(o.find("vp"));
+                set_vec(o, "vp", [v[0] + d[0], v[1] + d[1], v[2] + d[2]]);
+            }
+        }
+    }
+
+    /// Rotate a selection by +90° about `axis` around the integer voxel `pivot`.
+    pub fn rotate_quarter(&mut self, ids: &[CompId], axis: usize, pivot: [i32; 3]) {
+        if ids.is_empty() {
+            return;
+        }
+        self.checkpoint();
+        let q = quarter_turn(axis);
+        for &id in ids {
+            if let Some(o) = self.comp_mut(id).and_then(|c| c.find_mut("o")) {
+                let r = unmat(&mul(&q, &mat(&rot_of(o))));
+                if r == IDENTITY {
+                    o.remove_attr("r");
+                } else {
+                    o.set("r", &r.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(","));
+                }
+                let v = v3(o.find("vp"));
+                let rel = [v[0] - pivot[0], v[1] - pivot[1], v[2] - pivot[2]];
+                let n: Vec<i32> = (0..3).map(|i| (0..3).map(|k| q[i][k] * rel[k]).sum::<i32>() + pivot[i]).collect();
+                set_vec(o, "vp", [n[0], n[1], n[2]]);
+            }
+        }
+    }
+
+    /// Remove components. Returns how many were removed.
+    pub fn delete(&mut self, ids: &[CompId]) -> usize {
+        if ids.is_empty() {
+            return 0;
+        }
+        self.checkpoint();
+        let mut ids = ids.to_vec();
+        ids.sort();
+        ids.dedup();
+        let mut removed = 0;
+        for id in ids.into_iter().rev() {
+            let Some(cs) = self.components_el_mut(id.body) else { continue };
+            let mut seen = 0;
+            let mut at = None;
+            for (k, n) in cs.children.iter().enumerate() {
+                if let Node::Element(e) = n {
+                    if e.tag == "c" {
+                        if seen == id.comp {
+                            at = Some(k);
+                            break;
+                        }
+                        seen += 1;
+                    }
+                }
+            }
+            if let Some(k) = at {
+                cs.children.remove(k);
+                if k > 0 && matches!(&cs.children[k - 1], Node::Raw(s) if s.trim().is_empty()) {
+                    cs.children.remove(k - 1);
+                }
+                removed += 1;
+            }
+        }
+        removed
+    }
+
+    /// Duplicate components with an offset; returns the new ids (appended to their bodies).
+    pub fn duplicate(&mut self, ids: &[CompId], offset: [i32; 3]) -> Vec<CompId> {
+        if ids.is_empty() {
+            return vec![];
+        }
+        self.checkpoint();
+        let clones: Vec<(usize, Element)> = ids.iter().filter_map(|&id| self.comp_mut(id).map(|c| (id.body, c.clone()))).collect();
+        let mut out = Vec::new();
+        for (body, mut c) in clones {
+            if let Some(o) = c.find_mut("o") {
+                let v = v3(o.find("vp"));
+                set_vec(o, "vp", [v[0] + offset[0], v[1] + offset[1], v[2] + offset[2]]);
+            }
+            if let Some(cs) = self.components_el_mut(body) {
+                let n = cs.elements().filter(|e| e.tag == "c").count();
+                cs.push(c);
+                out.push(CompId { body, comp: n });
+            }
+        }
+        out
+    }
+
+    /// Add a new component of definition `def` at voxel `vp` (body `body`).
+    pub fn add(&mut self, body: usize, def: &str, vp: [i32; 3], rotation: [i32; 9]) -> Option<CompId> {
+        self.components_el_mut(body)?;
+        self.checkpoint();
+        let mut c = Element::new("c");
+        if def != "01_block" {
+            c.set("d", def);
+        }
+        let mut o = Element::new("o");
+        if rotation != IDENTITY {
+            o.set("r", &rotation.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(","));
+        }
+        o.set("sc", "6,x,x,x,x,x,x");
+        let mut vpe = Element::new("vp");
+        for (i, a) in ["x", "y", "z"].iter().enumerate() {
+            if vp[i] != 0 {
+                vpe.set(a, &vp[i].to_string());
+            }
+        }
+        o.push(vpe);
+        c.push(o);
+        let cs = self.components_el_mut(body)?;
+        let n = cs.elements().filter(|e| e.tag == "c").count();
+        cs.push(c);
+        Some(CompId { body, comp: n })
+    }
+}

@@ -1,0 +1,9 @@
+[package]
+name = "keel-app"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts", "x11", "wayland"] }
+serde_json = "1.0.154"
