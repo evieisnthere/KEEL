@@ -39,6 +39,8 @@ Product direction: `PROJECT_PLAN.md`. This file tracks what is actually done.
 | — | Propellers (force emitters) | **Recovered (E1):** RE-0007, load/thrust law. Absolute magnitudes unverified (blade count/variant flags) |
 | — | Torque networks + connections | **Recovered (E1):** RE-0008. Network solver, slot layout, gear ratios, port/pipe connection rules (pipes carry torque and fluid) |
 | — | Drivetrain sim | `sim-reference/sw_drivetrain.py`: topology extraction + 60 Hz ticks. 3556526754: rev-limited 60 RPS, 28.9 kn (waterline assumed). Other ships: topology gaps (connector_torque, pivots, electric motors) |
+| — | Fluids + pumps | **Recovered (E1):** RE-0010 pressure law, transfer law, pump head. Reference + tests |
+| — | Flooding / waterline | Shell walk ported with the game's own adjacency tables (exact on unit cases). Open: the "volume capped" stage for interiors open to the air |
 | — | Next RE | Torque network + gearbox ratios, `buoy_pipes`/flooding, microcontroller node catalogue (`0x1403698d0`), fluid networks |
 
 ## Recommended order once files arrive

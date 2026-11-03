@@ -163,3 +163,6 @@ parts = 63). It most likely marks pipe-through faces, not hull openings.
   interiors connected to the open air are not counted, and every sample ship is predicted to sink. The open question is the game's
   **"volume uncapped → volume capped"** stage. The physical expectation is that an open compartment still displaces water up to the
   height of its lowest opening. Decoding that stage is next.
+- User (E2): paintable sign blocks and paintable indicators are fully sealed. This is consistent with definitions (`sign_na`: six
+  buoyancy faces, one written without an `orientation` attribute, which defaults to 0). The walk reaching a sign means the
+  surrounding cabin is open to the air, not that the sign leaks.
