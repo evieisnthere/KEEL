@@ -1,0 +1,41 @@
+# KEEL — what is still needed
+
+This is the single register of known gaps at the end of Phase 0 (2026-11-03). Every item names where it is documented and
+how it gets closed: **RE** = more decompilation, **GAME** = in-game test by the user, **APP** = software work. When an item
+is closed, delete it here and update the RE document.
+
+## A. Simulation accuracy gaps (affect predictions)
+
+| # | Item | Impact | Where | Close by |
+|---|---|---|---|---|
+| A1 | **Waterline is an estimate.** The exact flooding pipeline is parked: the "volume capped" stage, compartment seeds (`field_830`, `0x14048c440`, `0x1402f81e0`), per-face sealing of open interiors, and the per-tick sea-water exchange | draft, trim, stability, top speed | RE-0004 §4–§8 | RE + GAME (test-pack barges A–F) |
+| A2 | Ported shell-walk volumes under-float 5 of 7 ships, so the vehicle-scale mass↔volume relationship is unconfirmed | as A1 | RE-0004 §8 | RE (body mass build in Bullet), GAME |
+| A3 | Sub-bodies (pivots, hinges, turrets) inside hulls add duplicate buoyancy. KEEL must warn about it, and the exact amount depends on A1 | as A1 | RE-0004 §8 | APP (warning), A1 |
+| A4 | Water drag inputs still unidentified: body scalar `L` (+0x94), `A_ref` (+0x798), sigma; drag sign confirmed only by inference | speed and drag curve | RE-0003 | RE |
+| A5 | Air-force altitude falloff exponents are assumed (0.6/0.4); the k value in air lift is not recovered | aircraft only | RE-0005, RE-0012 §5 | RE |
+| A6 | Drivetrain assumptions: cylinder size = voxel count; unlimited air/fuel supply and fixed manifold temperature; propeller blade count fixed at 4; gearbox accumulators applied immediately | engine operating point, fuel use | `sim-reference/sw_drivetrain.py` (ASSUME lines), RE-0006–0008 | RE (manifold/fluid coupling now that RE-0010 exists), GAME |
+| A7 | Drivetrain topology gaps on other ships: connector_torque, pivots carrying torque, electric motors on torque networks | top-speed validation | STATUS | APP (extend extractor; laws are known) |
+| A8 | Top-speed solver validated on one ship only (3556526754, 28.9 kn rev-limited, waterline assumed) | confidence | task #3 | APP + GAME |
+| A9 | Rudder `body[+8]` read as mass (it could be inverse mass); the keel righting couple's argument is inferred to be vehicle mass | turning rate | RE-0012 | GAME (test-pack R3) |
+| A10 | Electrical: what the 300-tick ramp counter measures; per-component draw constants for lights, displays, radars and seats; solar coefficients | battery life | RE-0011 §4 | RE |
+| A11 | Logic between physical components (outside microcontrollers) is assumed to take one tick per link | control-loop timing | RE-0013 §4 | GAME (test-pack L1) |
+| A12 | Microcontroller details: bridge type numbering is inferred; SR latch edge cases; the full expression grammar (operator precedence, boolean operators); Lua Script needs an embedded Lua VM | MC simulation | RE-0013 | RE + APP |
+| A13 | Not yet decoded at all: water jets, electric-motor torque slots on non-motor parts, jet engines, steam, wheels/tracks, winches/ropes, gyros, radar/sonar sensing models | anything using them | — | RE (when a feature needs it) |
+
+## B. File format gaps (affect export)
+
+| # | Item | Where | Close by |
+|---|---|---|---|
+| B1 | Vehicle `t` attribute, `sc` format, multi-body joint fields, and many `<o>` properties are unmapped. Round-trip is byte-exact, but authoring new parts needs them | RE-0002 | RE + corpus survey |
+| B2 | A KEEL-exported vehicle has never been loaded in game (round-trip R1/R2 in the test pack) | STATUS row 9 | GAME |
+| B3 | Unconfirmed conventions: rotation matrix convention (column-major) and the voxel-face flooding mask meaning | RE-0002 | GAME |
+
+## C. In-game calibration the user has been sent (`keel_test_pack.zip`)
+Barges A–F (draft, sealing, door frames), round-trip R1/R2. Still to add to the pack: **R3** (rudder force vs hull mass),
+**L1** (logic tick counting), **E1** (battery drain with a motor at fixed throttle), **S1** (straight-line top speed of
+3556526754 at full throttle).
+
+## D. Application (Phase 1 onward, see PROJECT_PLAN.md)
+- Geometry-kernel spike: truck vs opencascade-rs (ADR-0001).
+- Rust ports of the reference models, golden-tested against `sim-reference/`.
+- The UI: viewer → block editor → systems editor → simulation → export (plan phases 1–6).

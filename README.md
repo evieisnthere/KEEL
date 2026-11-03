@@ -6,6 +6,7 @@ superstructures, interiors, engines, drivetrains, electrical, fluid and logic sy
 KEEL can **predict how it will behave** (draft, stability, speed, fuel use, engine operating point) without the game running.
 
 Product direction lives in [`PROJECT_PLAN.md`](PROJECT_PLAN.md). Live progress is in [`docs/STATUS.md`](docs/STATUS.md).
+Everything still missing (research gaps, in-game checks, app work) is in [`docs/OPEN-ITEMS.md`](docs/OPEN-ITEMS.md).
 
 ---
 
