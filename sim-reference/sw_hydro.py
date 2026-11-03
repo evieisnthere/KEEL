@@ -96,3 +96,45 @@ def face_bin_force(normal: Vec, area: float, point_velocity: Vec, mass: float, *
     if fm > cap:
         f = _scale(f, cap / fm)
     return f
+
+
+@dataclass(frozen=True)
+class AirConstants:
+    air_density: float = 1.225
+    air_drag_factor: float = 0.2
+    air_drag_factor_linear_pressure: float = 0.05
+    air_drag_factor_quadratic_pressure: float = 0.1
+    air_drag_factor_linear_suction: float = 0.025
+    air_drag_factor_quadratic_suction: float = 0.05
+    air_falloff_power_pressure: float = 0.6   # assumed (powf args not visible), RE-0005
+    air_falloff_power_suction: float = 0.4    # assumed
+    air_speed_threshold: float = 15.0
+    air_high_speed_threshold: float = 50.0
+    air_high_speed_factor_scale: float = 8.0
+    viscous_air_resistance: float = 0.25
+    lift_force: float = 0.25
+
+
+KA = AirConstants()
+
+
+def air_face_bin_force(normal: Vec, area: float, point_velocity: Vec, *, wind: Vec = (0.0, 0.0, 0.0),
+                       length_L: float = 1.0, k: AirConstants = KA) -> Vec:
+    """Air force on one surface-type bin at sea level (altitude factor = 1). Y is up. RE-0005."""
+    u = _add(point_velocity, _scale(wind, -1.0))
+    s = _norm(u)
+    if s * s <= k.air_speed_threshold ** 2:
+        return (0.0, 0.0, 0.0)
+    uh = _scale(u, 1.0 / s)
+    se = s - k.air_speed_threshold
+    c = _dot(uh, normal)
+    m_hs = 1.0 + max(0.0, s - k.air_high_speed_threshold) * k.air_high_speed_factor_scale
+    visc = (k.viscous_air_resistance * k.air_density * (20.0 / (se * length_L / 1.81e-5 + 10.0) + 1.5) * 0.00075
+            * area * se * se * k.air_drag_factor * m_hs)
+    f = _scale(uh, -visc)
+    if c > 0:
+        f = _add(f, _scale(normal, -(c ** k.air_falloff_power_pressure) * (k.air_drag_factor_quadratic_pressure * se * se + k.air_drag_factor_linear_pressure * se) * area))
+    elif c < 0:
+        f = _add(f, _scale(normal, ((-c) ** k.air_falloff_power_suction) * (k.air_drag_factor_quadratic_suction * se * se + k.air_drag_factor_linear_suction * se) * area))
+    lift = k.lift_force * (1.0 - abs(c)) * _clamp(normal[1], 0.0, 1.0) * min(se * se, 2500.0) * area
+    return _add(f, _scale(normal, lift))

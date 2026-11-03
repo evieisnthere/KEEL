@@ -36,3 +36,12 @@ def test_impulse_cap_binds_for_light_body():
     s, m = 5.0, 10.0
     f = h.face_bin_force((0, 0, 1), 1.0, (0, 0, s), mass=m)
     assert math.isclose(math.sqrt(sum(c * c for c in f)), s * m * 0.5 / 60)
+
+
+def test_no_air_force_below_threshold():
+    assert h.air_face_bin_force((0, 0, 1), 1.0, (0, 0, 14.9)) == (0.0, 0.0, 0.0)
+
+
+def test_air_lift_on_flat_top_surface():
+    f = h.air_face_bin_force((0, 1, 0), 1.0, (0, 0, 40.0))
+    assert f[1] > 0  # flow parallel to an upward-facing surface gives upward lift
