@@ -36,6 +36,30 @@ convention is probably the opposite. Confirm before relying on sign.
 - Still to decode: how the enclosed volume and octree `V_n` weights are computed (`0x140488d20`, `0x140482ed0`, `0x1404914c0`),
   and how `buoy_pipes` (6-bit per-voxel mask) opens a shell to let water in.
 
+## 2b. Buoyancy volume: Z-column scan (`0x140488d20`, E1)
+
+The enclosed volume is **not** a closed-shell integral. The finish step loops over the body bounding box: x (outer), then y,
+then **z (inner)**, from z_min − 2 to z_max + 1 voxels. It keeps an "inside" state per column and reads each octree leaf's
+per-type area bins:
+- the previous voxel has a top face (types 4, 10, 16, 22, 28: full or quarter faces on its +z side) → leave;
+- the next voxel has a bottom face (types 5, 11, 17, 23, 29) → enter;
+- the current voxel has a slope whose solid side is above (types 30, 34, 35, 38, 42, 43, 48, 49, 52–55) → add ½ voxel and enter.
+  If the solid side is below (types 32, 36, 40, 41, 44–47, 50, 51, 56, 57), add ½ voxel and leave;
+- a full inside voxel adds 1. For empty inside voxels, the 6 neighbours are checked against a second sparse map, and
+  (direction, position) records are emitted. These are probably compartment openings and flood paths.
+
+The bounds come from the surface-insert routine (`0x1404829b0`), which tracks min/max of `vp`-space positions. So the scan
+axis is the **vehicle file's z axis**. A hull only needs to be closed along z (fore–aft if z is the vehicle's length). An open
+top or sides parallel to z don't break buoyancy. This fits open-top boats floating in game.
+Only faces reached by the edge-loop walk (seeded from bottom-facing types) are in the bins, so internal partitions should
+not toggle the state (E1-inferred).
+
+**Reference status:** `sim-reference/sw_buoyancy.py` implements a geometric z-scan (sub-sampled, depth-counting) plus a
+closed-shell check. Unit shapes are exact (block, wedge) or within sampling error (pyramids). On ~30 workshop vehicles, mass
+from definitions vs. this volume gives float ratios of 0.5–2.5. That's inconclusive: the classifier shows most samples are
+trains or cars, and boats are mixed. **Calibration needs the in-game barge test, or emulating the builder on a real body.**
+Possible gaps: walk-reachability (internal faces), the effective component mass model, and multi-body hulls.
+
 ## 3. Compartments and flooding (`0x14048d5b0`, E1)
 
 Each body has a ring buffer of compartments (`body+0x848`). Each holds an integer voxel bounding box (scaled by 0.25 m) and a

@@ -29,7 +29,9 @@ Product direction: `PROJECT_PLAN.md`. This file tracks what is actually done.
 | 10 | In-game load test | Needs the user |
 | — | Simulation plan | **Drafted:** `docs/engineering/simulation-plan.md` |
 | — | Water forces + buoyancy formula | **Recovered (E1):** RE-0003. Reference implementation in `sim-reference/sw_hydro.py`, 6 unit tests passing |
-| — | Buoyancy volume generator (enclosed air) | Next: decompile the generator behind the `field_1078` failure flag |
+| — | Surface types, conversion, buoyancy builder | **Recovered (E1):** RE-0004. 58 surface types and the definition→type conversion extracted by emulation. Builder = edge-loop shell walk + z-column scan |
+| — | Buoyancy volume calibration | Blocked on the in-game barge test (or emulating the builder on a real body) |
+| — | Component transform convention | `r` is column-major (world = rᵀ·v), E1-inferred from voxel-overlap minimisation |
 | — | Air kernel, compartments/flooding, engine | Not started |
 
 ## Recommended order once files arrive

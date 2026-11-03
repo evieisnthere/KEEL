@@ -113,8 +113,9 @@ def body_shell(components, defs, tables: SurfaceTables):
             vol6 += (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]))
     volume = -float(vol6) / 6.0 * HALF ** 3
     zvol = zscan_volume(kept)
+    axis_vols = [zscan_volume(kept, axis=a) for a in (0, 1)]
     return {"polygons": len(kept), "cancelled": cancelled, "unmatched_edges": unmatched,
-            "edge_segments": sum(edges.values()), "volume_closed_m3": volume, "volume_m3": zvol}
+            "edge_segments": sum(edges.values()), "volume_closed_m3": volume, "volume_m3": zvol, "volume_xscan_m3": axis_vols[0], "volume_yscan_m3": axis_vols[1]}
 
 
 def _inward_normal(q):
@@ -135,21 +136,23 @@ def _point_in_poly_xy(px, py, poly):
     return inside
 
 
-def zscan_volume(polys):
+def zscan_volume(polys, sub=2, axis=2):
     """Game-style buoyancy volume (RE-0004 §2b): scan +Z columns, toggle inside on Z-facing surfaces.
     Sub-sampled at 4 points per voxel column (offsets +-0.5 half-voxel units) to avoid hitting quarter-triangle seams.
     A column still 'inside' at the end is extended to the body's z_max + 1 voxel (the game's loop bound)."""
     cols = collections.defaultdict(list)
     zmax = -10**9
+    perm = {2: (0, 1, 2), 1: (2, 0, 1), 0: (1, 2, 0)}[axis]
+    polys = [[(v[perm[0]], v[perm[1]], v[perm[2]]) for v in p] for p in polys]
     for p in polys:
         n = _inward_normal(p)
         zmax = max(zmax, max(v[2] for v in p))
         if n[2] == 0:
             continue
         xs = [v[0] for v in p]; ys = [v[1] for v in p]
-        for sx in range(min(xs), max(xs)):
-            for sy in range(min(ys), max(ys)):
-                px, py = sx + 0.5, sy + 0.5
+        for sx in range(min(xs) * sub, max(xs) * sub):
+            for sy in range(min(ys) * sub, max(ys) * sub):
+                px, py = (sx + 0.5) / sub, (sy + 0.5) / sub
                 if not _point_in_poly_xy(px, py, p):
                     continue
                 a = p[0]
@@ -166,7 +169,7 @@ def zscan_volume(polys):
             elif prev > 0 >= depth and zin is not None: total += z - zin; zin = None
         if depth > 0 and zin is not None:
             total += zend - zin
-    return total * HALF ** 3  # each sub-column is 1x1 half-voxel units in cross-section
+    return total * HALF ** 3 / (sub * sub)
 
 
 def _winding_sign(p, ref):
