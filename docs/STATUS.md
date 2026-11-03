@@ -32,7 +32,8 @@ Product direction: `PROJECT_PLAN.md`. This file tracks what is actually done.
 | — | Surface types, conversion, buoyancy builder | **Recovered (E1):** RE-0004. 58 surface types and the definition→type conversion extracted by emulation. Builder = edge-loop shell walk + z-column scan |
 | — | Buoyancy volume calibration | Envelope z-scan model: 6/8 sample boats float plausibly. Test pack with predictions sent to the user (barges A, C, D, E, F + round-trip R1/R2) |
 | — | Component transform convention | `r` is column-major (world = rᵀ·v), E1-inferred from voxel-overlap minimisation |
-| — | Air kernel, compartments/flooding, engine | Not started |
+| — | Air forces | **Recovered (E1):** RE-0005, no air force below 15 m/s. Reference + tests |
+| — | Modular engine cylinder + couplings | **Recovered (E1):** RE-0006. Reference `sw_engine.py` + tests. Torque network/gearbox/propeller next |
 
 ## Recommended order once files arrive
 

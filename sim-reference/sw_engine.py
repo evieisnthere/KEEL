@@ -59,3 +59,18 @@ def couple(w_a, I_a, w_b, I_b, k=1.0):
     k = clamp(k, 0.0, 1.0)
     s = I_a + I_b
     return w_a + I_b / s * k * (w_b - w_a), w_b + I_a / s * k * (w_a - w_b)
+
+
+def propeller_tick(rps, pitch, *, max_force, rotation_speed, blade_length, blade_efficiency, efficiency,
+                   blades=4, bladed=True, v_axial=0.0, submerged=True):
+    """Force-emitter tick (RE-0007). Returns (new_rps, thrust_N, absorbed_rps)."""
+    rps *= 0.9999
+    f_eff = max_force * (blades / 8.0 if bladed else 1.0)
+    pitch = clamp(pitch, -1.0, 1.0)
+    bite = (2 * 3.1415927 * rps * rotation_speed * blade_length * pitch * 0.75 + pitch * v_axial) * blade_efficiency * blades * 0.32
+    lam = clamp(bite * 0.5 / (f_eff / 1000.0), -10.0, 10.0) if f_eff > 0 else 0.0
+    if submerged:
+        lam *= 10.0
+    absorbed = (1.0 - 1.0 / (1.0 + lam * lam)) * rps
+    thrust = absorbed * (f_eff / 1000.0) * 1500.0 * efficiency * (1.0 if pitch >= 0 else -1.0)
+    return rps - absorbed, thrust, absorbed
