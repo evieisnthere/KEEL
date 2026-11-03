@@ -46,6 +46,18 @@ vehicle[data_version, bodies_id]
 - Connections are stored as pairs of voxel positions, not component IDs. So moving a component means rewriting its links.
 - Still to map: `t` (looks like a shape/transform variant, 0–4 seen), the `sc` format, multi-body joints, and every `o` property.
 
+## Axes and transforms (E1-inferred)
+
+- Voxel axes: **+Y up, Z fore–aft (bow toward +Z in the samples checked), X beam**, from orthographic occupancy renders
+  of workshop boats (`tools/viz/silhouettes.py`).
+- `o@r` is column-major: world offset = rᵀ · v (lowest voxel-overlap count across samples).
+- Missing `vp` axes and a missing `r` mean 0 and identity. The game writes zero axes by omission, and KEEL's writer does the same.
+
+## Lossless I/O (implemented)
+
+`src/keel_io/losslessxml.py` + `src/keel_io/vehicle.py`: **all 850 sample files (164 MB) round-trip byte-identically**,
+including playlists and all 759 non-standard definition files. Edits re-serialise only the touched element (unit-tested).
+
 ## Next
 
 1. Coordinate convention: compare `vp` and `r` against definition voxel extents on a few known shapes.

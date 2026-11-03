@@ -22,10 +22,10 @@ Product direction: `PROJECT_PLAN.md`. This file tracks what is actually done.
 | 3b | Game data files (definitions, meshes) | Definitions received (759). Meshes too large; preview from voxels instead |
 | 4 | XML structure report | First pass done (RE-0002) |
 | 5 | Smallest round-trip fixture | Candidate: `3607751095` (174 comps, 1 body, includes 3 MCs) |
-| 6 | Lossless parser | Not started |
-| 7 | Vehicle model + coordinate tests | Not started |
+| 6 | Lossless parser | **Done:** `src/keel_io`. 850/850 sample files byte-identical, local edits tested |
+| 7 | Vehicle model + coordinate tests | Model done (`keel_io.vehicle`). Axes: Y up, Z fore–aft (E1-inferred) |
 | 8 | Viewport prototype | Not started |
-| 9 | No-op round-trip export | Not started |
+| 9 | No-op round-trip export | Implemented. In-game load test pending (user) |
 | 10 | In-game load test | Needs the user |
 | — | Simulation plan | **Drafted:** `docs/engineering/simulation-plan.md` |
 | — | Water forces + buoyancy formula | **Recovered (E1):** RE-0003. Reference implementation in `sim-reference/sw_hydro.py`, 6 unit tests passing |
