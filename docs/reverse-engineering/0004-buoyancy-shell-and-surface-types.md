@@ -150,3 +150,16 @@ parts = 63). It most likely marks pipe-through faces, not hull openings.
   `research/extracted-metadata/surface_adjacency.json`: 45 lists × 12 candidates `(order, dx, dy, dz, neighbour edge id, neighbour
   surface type)`. Edge ids follow `6·m + face`. **Next:** port `0x140488260` (walk step) and `0x140488d20` (z-scan) exactly on top of
   these lists, then re-run the boats.
+
+
+## 7. Ported shell walk (`sim-reference/sw_shellwalk.py`)
+
+- Full per-edge candidate tables: **264 edge ids**, 8 or 12 ordered candidates each (the builder loops `edge < 0x108`). An earlier
+  dump with only 45 lists was an emulator instruction-cap artefact. Edge-type twins (back faces) exist for all 58 types.
+- Port: both-sided surface registration, full-face → quarter normalisation, head-edge expansion into the first present candidate,
+  cancellation on revisits. On two adjacent blocks the walk visits exactly the 10 outer faces. All unit cases are exact (block,
+  wedge, closed box, open-top box, door-frame cap, solid).
+- **On real ships the outer walk reaches interior cabins** (e.g. the Lagoon's cabin sign at y = +5 is on the outer shell), so
+  interiors connected to the open air are not counted, and every sample ship is predicted to sink. The open question is the game's
+  **"volume uncapped → volume capped"** stage. The physical expectation is that an open compartment still displaces water up to the
+  height of its lowest opening. Decoding that stage is next.
