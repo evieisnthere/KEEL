@@ -41,6 +41,7 @@ Product direction: `PROJECT_PLAN.md`. This file tracks what is actually done.
 | — | Drivetrain sim | `sim-reference/sw_drivetrain.py`: topology extraction + 60 Hz ticks. 3556526754: rev-limited 60 RPS, 28.9 kn (waterline assumed). Other ships: topology gaps (connector_torque, pivots, electric motors) |
 | — | Fluids + pumps | **Recovered (E1):** RE-0010 pressure law, transfer law, pump head. Reference + tests |
 | — | Flooding / waterline | **Pinned as an estimate** (product owner, 2026-11-03): envelope z-scan draft. Shell walk ported (exact on unit cases); the "volume capped" stage and per-face sealing are parked. `buoy_*` definition fields are a debug draw only (E1). Sub-bodies inside hulls add duplicate buoyancy (RE-0004 §8) |
+| — | Electrical | **Recovered (E1):** RE-0011. Battery pool (10-unit window per battery), network charge factor, motor/generator/diode/relay laws. `sim-reference/sw_electric.py` + 5 tests |
 | — | Next RE | Torque network + gearbox ratios, `buoy_pipes`/flooding, microcontroller node catalogue (`0x1403698d0`), fluid networks |
 
 ## Recommended order once files arrive
