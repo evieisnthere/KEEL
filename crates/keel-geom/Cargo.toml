@@ -1,0 +1,12 @@
+[package]
+name = "keel-geom"
+description = "KEEL geometry: NURBS curves/surfaces, parametric hulls, hydrostatics, voxelisation to Stormworks blocks"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+keel-model = { path = "../keel-model" }
+keel-io = { path = "../keel-io" }

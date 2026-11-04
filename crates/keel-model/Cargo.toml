@@ -1,0 +1,10 @@
+[package]
+name = "keel-model"
+description = "KEEL vehicle model: component catalogue, geometry, editing, diagnostics (no UI)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+keel-io = { path = "../keel-io" }
+serde_json = "1"

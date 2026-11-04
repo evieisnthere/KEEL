@@ -45,6 +45,7 @@ Product direction: `PROJECT_PLAN.md`. This file tracks what is actually done.
 | — | Rudders / fins / control surfaces / keels / wings | **Recovered (E1):** RE-0012. Electric-powered actuator (instant when powered), linear normal-velocity water force with area saturating at 10 (all stock parts equal in water), keel ×40 + righting couple, air path. `sim-reference/sw_rudder.py` |
 | — | Microcontrollers / logic | **Recovered (E1):** RE-0013. XML format, all 60 component types (emulated catalogue), latch-then-compute execution (one tick per component), stateful component behaviours |
 | — | Phase 0 | **Closed by product owner (2026-11-03)**: enough decoded to start the application. Waterline remains an estimate (RE-0004 §8) |
+| — | Phase 1 app | `crates/keel-app` (`keel` binary): viewer and block editor (select/move/rotate/duplicate/delete/place, undo/redo, save/export, scale tool with sealing warning, diagnostics). Software-rasterised viewport for now; wgpu renderer is the next step for 50k-part ships |
 | — | Next RE | Torque network + gearbox ratios, `buoy_pipes`/flooding, microcontroller node catalogue (`0x1403698d0`), fluid networks |
 
 ## Recommended order once files arrive

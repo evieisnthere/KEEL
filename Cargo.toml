@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/keel-io"]
+members = ["crates/keel-app", "crates/keel-geom","crates/keel-io", "crates/keel-model"]
 
 [workspace.package]
 edition = "2021"
