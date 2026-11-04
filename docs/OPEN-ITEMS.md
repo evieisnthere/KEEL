@@ -14,6 +14,8 @@ is closed, delete it here and update the RE document.
 | A4 | Water drag inputs still unidentified: body scalar `L` (+0x94), `A_ref` (+0x798), sigma; drag sign confirmed only by inference | speed and drag curve | RE-0003 | RE |
 | A5 | Air-force altitude falloff exponents are assumed (0.6/0.4); the k value in air lift is not recovered | aircraft only | RE-0005, RE-0012 §5 | RE |
 | A6 | Drivetrain assumptions: cylinder size = voxel count; unlimited air/fuel supply and fixed manifold temperature; propeller blade count fixed at 4; gearbox accumulators applied immediately | engine operating point, fuel use | `sim-reference/sw_drivetrain.py` (ASSUME lines), RE-0006–0008 | RE (manifold/fluid coupling now that RE-0010 exists), GAME |
+| A6b | **Propulsion is uncalibrated.** With the recovered laws (RE-0006/0007/0008) a 2-cylinder 3×3 engine on a large propeller pushes a 5 t box to ~100 m/s: the clutch slot (mass `e·I_crank`) refills the shaft every tick and the propeller converts the absorbed rps to thrust at `F_eff/1000 · 1500` N per rps. A constant or unit in the thrust law (or the propeller slot mass) is likely off. KEEL's Power calculators carry a thrust calibration factor until an in-game top-speed test sets it | top speed, fuel use, range | `keel-power`, RE-0007 | GAME (calibration boat C1), RE |
+| A6c | RE-0011's worked generator example (0.19 units/tick at 10 rps) is 10× smaller than its own formula (1.90) | charging rates | RE-0011 §3 | RE |
 | A7 | Drivetrain topology gaps on other ships: connector_torque, pivots carrying torque, electric motors on torque networks | top-speed validation | STATUS | APP (extend extractor; laws are known) |
 | A8 | Top-speed solver validated on one ship only (3556526754, 28.9 kn rev-limited, waterline assumed) | confidence | task #3 | APP + GAME |
 | A9 | Rudder `body[+8]` read as mass (it could be inverse mass); the keel righting couple's argument is inferred to be vehicle mass | turning rate | RE-0012 | GAME (test-pack R3) |
@@ -34,6 +36,11 @@ is closed, delete it here and update the RE document.
 Barges A–F (draft, sealing, door frames), round-trip R1/R2. Still to add to the pack: **R3** (rudder force vs hull mass),
 **L1** (logic tick counting), **E1** (battery drain with a motor at fixed throttle), **S1** (straight-line top speed of
 3556526754 at full throttle).
+
+**C1 (propulsion calibration, requested 2026-11-04):** the KEEL "Planing" preset hull baked and saved from KEEL, plus
+one large electric motor driving one small propeller directly, a small battery and a throttle lever at 100 %. Report
+the steady top speed and the mass the editor shows. KEEL then sets the thrust factor (`keel_power::solve::calibrate`).
+This also exercises the round trip (B2).
 
 ## D. Application (Phase 1 onward, see PROJECT_PLAN.md)
 - Geometry-kernel spike: truck vs opencascade-rs (ADR-0001).

@@ -22,11 +22,13 @@ pub struct DesignDoc {
     pub baked: Vec<Placement>,
     /// interior design (Decks mode)
     pub interior: crate::interior::InteriorDoc,
+    /// powertrain design (Power mode)
+    pub power: crate::power::PowerDoc,
 }
 
 impl Default for DesignDoc {
     fn default() -> Self {
-        DesignDoc { hull: HullParams::default(), origin: [0, 0, 0], shell: 1, deck: true, topside: "E8E8E4".into(), bottom: "7A2A1E".into(), baked: vec![], interior: Default::default() }
+        DesignDoc { hull: HullParams::default(), origin: [0, 0, 0], shell: 1, deck: true, topside: "E8E8E4".into(), bottom: "7A2A1E".into(), baked: vec![], interior: Default::default(), power: Default::default() }
     }
 }
 
@@ -185,6 +187,11 @@ impl Design {
 
     /// Right panel: hydrostatics readout.
     pub fn hydro_ui(&self, ui: &mut egui::Ui) {
+        let p = &self.doc.hull;
+        // the game refuses vehicles larger than its editor volumes (RE-0003 load-time validation): about 58 m long
+        if p.length > 58.25 || p.beam > 23.5 {
+            ui.label(RichText::new(format!("Too large for the game: {:.1} × {:.1} m. Vehicles must fit about 58 m long and 23.5 m wide (RE-0003); split the ship or scale it down.", p.length, p.beam)).color(theme::RED));
+        }
         theme::section(ui, "Hydrostatics (real world, sea water)");
         let Some(h) = &self.hydro else {
             ui.label(RichText::new("Hull could not be built from these parameters").color(theme::ORANGE));

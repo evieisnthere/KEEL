@@ -3,6 +3,7 @@
 //! Usage: `keel [vehicle.xml] [--defs <rom/data/definitions>]`. The definitions folder is remembered in the settings file.
 mod design;
 mod interior;
+mod power;
 mod settings;
 mod theme;
 mod viewport;
@@ -20,6 +21,7 @@ enum Mode {
     Build,
     Hull,
     Decks,
+    Power,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -57,6 +59,7 @@ struct KeelApp {
     mode: Mode,
     design: design::Design,
     interior: interior::Interior,
+    power: power::Power,
     frame_next_hull: bool,
     bake_on_start: bool,
 }
@@ -100,9 +103,10 @@ impl KeelApp {
             clean: args.clean,
             zoom: args.zoom,
             look: args.look,
-            mode: match args.mode.as_deref() { Some("hull") => Mode::Hull, Some("decks") => Mode::Decks, _ => Mode::Build },
+            mode: match args.mode.as_deref() { Some("hull") => Mode::Hull, Some("decks") => Mode::Decks, Some("power") => Mode::Power, _ => Mode::Build },
             design: design::Design::default(),
             interior: interior::Interior::with_docked(args.plan_docked),
+            power: power::Power::default(),
             frame_next_hull: true,
             bake_on_start: args.bake,
             settings,
@@ -149,6 +153,7 @@ impl KeelApp {
                 self.settings.push_recent(&p);
                 self.design.doc = design::Design::load_for(&p);
                 self.interior.doc = self.design.doc.interior.clone();
+                self.power.doc = self.design.doc.power.clone();
                 self.path = Some(p);
                 self.faces_gen = u64::MAX;
                 self.frame_next = true;
@@ -161,6 +166,7 @@ impl KeelApp {
         match std::fs::write(&p, self.model.to_xml()) {
             Ok(()) => {
                 self.design.doc.interior = self.interior.doc.clone();
+                self.design.doc.power = self.power.doc.clone();
                 self.design.save_for(&p);
                 self.model.dirty = false;
                 self.status = format!("Saved {}", p.display());
@@ -495,7 +501,7 @@ impl KeelApp {
             ui.add_space(12.0);
             theme::pill().show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    for (m, name, tip) in [(Mode::Build, "Build", "Block editor and catalogue"), (Mode::Hull, "Hull", "Parametric NURBS hull, hydrostatics, bake to blocks"), (Mode::Decks, "Decks", "Deck and floor planning, generators")] {
+                    for (m, name, tip) in [(Mode::Build, "Build", "Block editor and catalogue"), (Mode::Hull, "Hull", "Parametric NURBS hull, hydrostatics, bake to blocks"), (Mode::Decks, "Decks", "Deck and floor planning, generators"), (Mode::Power, "Power", "Powertrain designer and calculators")] {
                         if theme::tool_button(ui, self.mode == m, name, tip) {
                             self.mode = m;
                         }
@@ -750,6 +756,12 @@ impl eframe::App for KeelApp {
                     self.design.refresh();
                     bake = self.design.params_ui(ui);
                 }
+                Mode::Power => {
+                    self.design.refresh();
+                    let mass: f64 = self.model.components().iter().map(|(_, c)| self.catalogue.get(&c.def).map(|d| d.mass).unwrap_or(0.0)).sum();
+                    self.power.refresh(self.design.hull.as_ref(), &self.design.doc.hull, mass);
+                    self.power.panel_ui(ui);
+                }
                 Mode::Decks => {
                     self.design.refresh();
                     self.interior.refresh(self.design.hull.as_ref(), &self.design.doc.hull, self.design.doc.origin);
@@ -767,6 +779,10 @@ impl eframe::App for KeelApp {
             egui::Panel::right("right").frame(theme::side_frame()).default_size(310.0).show(ui, |ui| {
                 if self.mode == Mode::Hull {
                     self.design.hydro_ui(ui);
+                    ui.separator();
+                }
+                if self.mode == Mode::Power {
+                    self.power.results_ui(ui);
                     ui.separator();
                 }
                 self.right_panel(ui)
