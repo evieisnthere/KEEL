@@ -233,6 +233,45 @@ impl Model {
         }
     }
 
+    /// Per-local-axis scale currently baked into a component's transform (XML scale edit); 1 = unscaled.
+    pub fn scale_of(r: &[i32; 9]) -> [i32; 3] {
+        let mut out = [1; 3];
+        for (j, o) in out.iter_mut().enumerate() {
+            let col = &r[3 * j..3 * j + 3];
+            *o = col.iter().map(|x| x.abs()).max().unwrap_or(0);
+        }
+        out
+    }
+
+    /// Apply a user scale (integer factor per local axis, 0 allowed) the same way workshop XML edits do: by scaling
+    /// the columns of `r`. Replaces any existing scale. **Sealing is only guaranteed at the block's origin voxel**:
+    /// the buoyancy shell is built from the definition's surfaces, which do not move with the scale (UI must warn).
+    pub fn set_scale(&mut self, ids: &[CompId], scale: [i32; 3]) {
+        if ids.is_empty() {
+            return;
+        }
+        self.checkpoint();
+        for &id in ids {
+            if let Some(o) = self.comp_mut(id).and_then(|c| c.find_mut("o")) {
+                let mut r = rot_of(o);
+                for j in 0..3 {
+                    let col = [r[3 * j], r[3 * j + 1], r[3 * j + 2]];
+                    let m = col.iter().map(|x| x.abs()).max().unwrap_or(0);
+                    // recover the unit direction; a zero column (scaled to nothing) falls back to the identity axis
+                    let unit: [i32; 3] = if m == 0 { [IDENTITY[3 * j], IDENTITY[3 * j + 1], IDENTITY[3 * j + 2]] } else { col.map(|x| x / m) };
+                    for i in 0..3 {
+                        r[3 * j + i] = unit[i] * scale[j];
+                    }
+                }
+                if r == IDENTITY {
+                    o.remove_attr("r");
+                } else {
+                    o.set("r", &r.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(","));
+                }
+            }
+        }
+    }
+
     /// Remove components. Returns how many were removed.
     pub fn delete(&mut self, ids: &[CompId]) -> usize {
         if ids.is_empty() {

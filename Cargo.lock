@@ -1034,6 +1034,8 @@ name = "keel-app"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "keel-io",
+ "keel-model",
  "serde_json",
 ]
 

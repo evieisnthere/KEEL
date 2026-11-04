@@ -1,9 +1,16 @@
 [package]
 name = "keel-app"
+description = "KEEL desktop application"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
-version.workspace = true
+
+[[bin]]
+name = "keel"
+path = "src/main.rs"
 
 [dependencies]
-eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts", "x11", "wayland"] }
-serde_json = "1.0.154"
+keel-io = { path = "../keel-io" }
+keel-model = { path = "../keel-model" }
+eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts", "x11", "wayland", "__screenshot"] }
+serde_json = "1"

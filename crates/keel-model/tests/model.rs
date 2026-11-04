@@ -78,3 +78,18 @@ fn scaled_xml_edit_renders_scaled_and_roundtrips() {
     let d = diagnostics::check(&m, &Catalogue::fallback());
     assert!(d.iter().any(|x| x.code == "xml-edited-transform" && x.severity == diagnostics::Severity::Info));
 }
+
+#[test]
+fn user_scale_matches_workshop_form() {
+    let mut m = Model::parse(SRC).unwrap();
+    let id = [CompId { body: 0, comp: 1 }];
+    m.set_scale(&id, [1, 5, 1]);
+    assert!(m.to_xml().contains("r=\"1,0,0,0,5,0,0,0,1\""));
+    m.rotate_quarter(&id, 0, [2, 0, 0]);
+    assert_eq!(Model::scale_of(&m.components()[1].1.rotation), [1, 5, 1]);
+    m.set_scale(&id, [1, 1, 1]);
+    assert_eq!(Model::scale_of(&m.components()[1].1.rotation), [1, 1, 1]);
+    m.set_scale(&id, [0, 0, 0]);
+    m.set_scale(&id, [2, 2, 2]);
+    assert_eq!(Model::scale_of(&m.components()[1].1.rotation), [2, 2, 2]);
+}
