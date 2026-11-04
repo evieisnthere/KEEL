@@ -128,6 +128,40 @@ pub fn path_height(steps: &[Step], p: f64) -> f64 {
     steps.last().map(|s| (s.h0 + s.rise) as f64).unwrap_or(0.0)
 }
 
+/// The 16 standard block definitions with their solid type index (keel_model::geometry::block_points).
+pub const ALL_BTS: [(i32, &str); 16] = [
+    (0, "01_block"),
+    (1, "02_wedge"),
+    (2, "03_pyramid"),
+    (3, "04_invpyramid"),
+    (4, "05_wedge_2"),
+    (5, "06_pyramid_2"),
+    (6, "07_invpyramid_2"),
+    (7, "08_wedge_4"),
+    (8, "09_pyramid_4"),
+    (9, "10_invpyramid_4"),
+    (10, "11_pyramid_2x2"),
+    (11, "12_pyramid_2x4"),
+    (12, "13_pyramid_4x4"),
+    (13, "14_invpyramid_2x2"),
+    (14, "15_invpyramid_2x4"),
+    (15, "16_invpyramid_4x4"),
+];
+
+/// Solid vertices of a placed block in eighth-metre units (e = 2ℓ − 1 lattice coordinates).
+pub fn placement_points8(pl: &Placement) -> Vec<[i32; 3]> {
+    let Some(&(bt, _)) = ALL_BTS.iter().find(|(_, d)| *d == pl.def) else { return vec![] };
+    let r = pl.r;
+    keel_model::geometry::block_points(bt)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|p| {
+            let p = p.map(|x| (x * 8.0).round() as i32);
+            [0, 1, 2].map(|i| r[i] * p[0] + r[3 + i] * p[1] + r[6 + i] * p[2] + 2 * pl.vp[i])
+        })
+        .collect()
+}
+
 /// Axis mapping of a height-field region into the vehicle frame. Coordinates are lattice units: voxel i spans [i, i+1]
 /// along each axis before `flip`. `flip` mirrors an axis about lattice 0 (voxel −1 ↔ voxel 0 edge), used for port.
 #[derive(Debug, Clone, Copy)]
@@ -151,7 +185,7 @@ pub struct Filled {
     pub unmatched: usize,
 }
 
-fn to_world8(frame: &Frame, h: i32, u: i32, v: i32) -> [i32; 3] {
+pub(crate) fn to_world8(frame: &Frame, h: i32, u: i32, v: i32) -> [i32; 3] {
     // lattice coordinate ℓ → eighth-metre units: e = 2ℓ − 1 (voxel i spans e ∈ [2i−1, 2i+1])
     let mut w = [0i32; 3];
     w[frame.h_axis] = h;
@@ -164,7 +198,7 @@ fn to_world8(frame: &Frame, h: i32, u: i32, v: i32) -> [i32; 3] {
     e
 }
 
-fn voxel_of(frame: &Frame, h: i32, u: i32, v: i32) -> [i32; 3] {
+pub(crate) fn voxel_of(frame: &Frame, h: i32, u: i32, v: i32) -> [i32; 3] {
     let mut w = [0i32; 3];
     w[frame.h_axis] = h;
     w[frame.u_axis] = u;
@@ -179,24 +213,7 @@ fn voxel_of(frame: &Frame, h: i32, u: i32, v: i32) -> [i32; 3] {
 /// Fill an additive region H(u, v) = c + A(u) + B(v). `depth` = number of full cube layers behind the skin
 /// (1 = a one-voxel shell). `keep` filters tiles (u0, v0) (e.g. domain limits).
 pub fn fill_additive(frame: &Frame, c: i32, a: &[Step], b: &[Step], depth: i32, keep: &dyn Fn(i32, i32) -> bool) -> Filled {
-    let all_bts: Vec<(i32, &'static str)> = vec![
-        (0, "01_block"),
-        (1, "02_wedge"),
-        (2, "03_pyramid"),
-        (3, "04_invpyramid"),
-        (4, "05_wedge_2"),
-        (5, "06_pyramid_2"),
-        (6, "07_invpyramid_2"),
-        (7, "08_wedge_4"),
-        (8, "09_pyramid_4"),
-        (9, "10_invpyramid_4"),
-        (10, "11_pyramid_2x2"),
-        (11, "12_pyramid_2x4"),
-        (12, "13_pyramid_4x4"),
-        (13, "14_invpyramid_2x2"),
-        (14, "15_invpyramid_2x4"),
-        (15, "16_invpyramid_4x4"),
-    ];
+    let all_bts: Vec<(i32, &'static str)> = ALL_BTS.to_vec();
     let mut out = Filled { placements: vec![], occupied: HashMap::new(), unmatched: 0 };
     let mut cache: HashMap<Vec<[i32; 3]>, Option<(&'static str, [i32; 9], [i32; 3])>> = HashMap::new();
     for sa in a {

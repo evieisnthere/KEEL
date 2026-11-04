@@ -7,6 +7,9 @@ pub mod facets;
 pub mod lattice;
 pub mod hullblocks;
 pub mod metrics;
+pub mod ghf;
+pub mod tiling;
+pub mod sweep;
 
 /// A hull as a voxelisable solid (sections cached per sample plane).
 pub struct HullSolid<'a> {

@@ -167,6 +167,32 @@ Default 20 m hull: **0 leaks; mid-zone step faces 5.2 %** (target < 3 %). The re
 (z 5–7 m), where the bottom rises and the plan narrows at the same time. The bow and stern zones are 51 % steps, because
 the closure cubes terrace the forefoot. These are the P2/P3 seam and stem work.
 
+### Swept-curve builder (current, 2026-11-04)
+
+This replaces the P1 regions, after product-owner guidance on how builders shape a bow: "from the front, a few 1×1
+blocks wide, then 1×2 slopes, 1×1 slopes, 1×2 and 1×4 slopes to define the curve, then pyramids down from there".
+
+* **Model** (`hullblocks.rs`, `sweep.rs`):
+  * Side: the deck-edge plan curve, a monotone lattice path (steps flat, 1×4, 1×2, 1×1, 2×1 and the flat front),
+    fitted by DP so its slope only steepens toward the stem. It is moved inward per row by the midship flare offset
+    B(ℓy), and curls under at 45° below the chine.
+  * Bottom: the keel profile, a lattice path (flat keel, forefoot slopes, vertical stem), moved up by the deadrise
+    D(ℓx). Deadrise slopes are limited to 0, ½ and 1, so the crease with the side's 45° curl lands on lattice points.
+  * Deck: sheer ramps. Transom: flat.
+  * Sweeping a plan segment by a row offset gives a plane. For slopes up to 1×1, and for the flat front, every offset
+    rate (0, ¼, ½, 1 per row) gives a tileable plane (wedge or pyramid pair, including 2×4 and 4×4). 2×1 segments need a
+    rate of ½ or more.
+* **Realisation** (`tiling.rs`): label-consistent tiling. Every block, in every type and rotation, whose lattice-corner
+  labels match the model is a valid piece. The largest go first, then 1-voxel blocks, then shell cubes. The starboard
+  half is tiled and mirrored; the centre column takes only mirror-symmetric blocks. Watertight by construction (0 leaks
+  on every preset).
+* **Review tools**:
+  * `scripts/hullshot.py` (depth-buffered flat-colour renders; `--bytype` colours cubes, 1-voxel blocks and long blocks);
+  * the `curves`, `modelcheck`, `steps`, `maskat` and `blocksat` examples.
+
+Remaining: a few 1-voxel pieces where the rising keel meets the side near the stem, and orange 1-voxel blocks at the deck
+edge where the sheer ramps cross the plan curve.
+
 ## 6. Open questions
 
 * Should the bow and stern prefer pyramid facets everywhere (smoothest), or allow 1-voxel steps where the gradient

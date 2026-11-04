@@ -26,6 +26,8 @@ pub struct Metrics {
     pub end_step_area: f64,
     /// exposed faces that are steps: (centroid metres, normal)
     pub steps: Vec<([f64; 3], [f64; 3])>,
+    /// every exposed face: (polygon in metres, outward normal, is a step, block index)
+    pub faces: Vec<(Vec<[f64; 3]>, [f64; 3], bool, usize)>,
 }
 
 impl Metrics {
@@ -82,7 +84,63 @@ fn to_m(e: [f64; 3]) -> [f64; 3] {
     [e[0] * 0.125, (e[1] + 1.0) * 0.125, e[2] * 0.125]
 }
 
+/// Compare the rasterised blocks with a reference solid (hull metres): per voxel, the number of the 64 samples where
+/// they disagree. Returns (voxel, extra samples (block but not reference), missing samples), worst first.
+pub fn compare(placements: &[Placement], reference: &dyn Fn([f64; 3]) -> bool) -> Vec<([i32; 3], usize, usize)> {
+    let polys: Vec<(Poly, usize)> = placements.iter().enumerate().filter_map(|(i, p)| block_poly(p).map(|q| (q, i))).collect();
+    let mut solid: HashMap<[i32; 3], u64> = HashMap::new();
+    let mut voxels: std::collections::HashSet<[i32; 3]> = Default::default();
+    let samp = |v: [i32; 3], k: usize| -> [f64; 3] {
+        let o = [k & 3, (k >> 2) & 3, (k >> 4) & 3];
+        [0, 1, 2].map(|i| 2.0 * v[i] as f64 - 1.0 + 0.25 + 0.5 * o[i] as f64 + [0.0131, 0.0173, 0.0197][i])
+    };
+    for (p, _) in &polys {
+        let lo = [0, 1, 2].map(|i| ((p.lo[i] + 1.0) / 2.0).floor() as i32);
+        let hi = [0, 1, 2].map(|i| ((p.hi[i] + 1.0) / 2.0).ceil() as i32 - 1);
+        for x in lo[0]..=hi[0] {
+            for y in lo[1]..=hi[1] {
+                for z in lo[2]..=hi[2] {
+                    let v = [x, y, z];
+                    voxels.insert(v);
+                    for k in 0..64 {
+                        let q = samp(v, k);
+                        if p.planes.iter().all(|(nn, d)| nn[0] * q[0] + nn[1] * q[1] + nn[2] * q[2] <= d + 1e-6) {
+                            *solid.entry(v).or_default() |= 1 << k;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let mut out = vec![];
+    for v in voxels {
+        let s = solid.get(&v).copied().unwrap_or(0);
+        let (mut extra, mut missing) = (0, 0);
+        for k in 0..64 {
+            let r = reference(to_m(samp(v, k)));
+            let b = s & (1 << k) != 0;
+            if b && !r {
+                extra += 1;
+            }
+            if r && !b {
+                missing += 1;
+            }
+        }
+        if extra + missing > 0 {
+            out.push((v, extra, missing));
+        }
+    }
+    out.sort_by_key(|x| std::cmp::Reverse(x.1 + x.2));
+    out
+}
+
 pub fn measure(placements: &[Placement], hull: &Hull) -> Metrics {
+    measure_with(placements, hull, None)
+}
+
+/// As [`measure`], with an optional interior test (hull metres) used for the leak seeds instead of the NURBS: a seed
+/// is any outside-reachable sample where `interior` holds half a voxel deep in every axis direction.
+pub fn measure_with(placements: &[Placement], hull: &Hull, interior: Option<&dyn Fn([f64; 3]) -> bool>) -> Metrics {
     let solid = crate::HullSolid::new(hull);
     let polys: Vec<Poly> = placements.iter().filter_map(block_poly).collect();
     let mut m = Metrics { blocks: placements.len(), ..Default::default() };
@@ -175,12 +233,19 @@ pub fn measure(placements: &[Placement], hull: &Hull) -> Metrics {
                     continue;
                 }
                 let e = pos(a, b, c);
-                if e[1] > deck_e - 4.0 {
+                if interior.is_none() && e[1] > deck_e - 4.0 {
                     continue;
                 }
                 let q = to_m(e);
+                let seed = match interior {
+                    Some(f) => {
+                        let h = VOXEL;
+                        [[0.0, 0.0, 0.0], [h, 0.0, 0.0], [-h, 0.0, 0.0], [0.0, h, 0.0], [0.0, -h, 0.0], [0.0, 0.0, h], [0.0, 0.0, -h]].iter().all(|o| f([q[0] + o[0], q[1] + o[1], q[2] + o[2]]))
+                    }
+                    None => false,
+                };
                 let ins = |dx: f64, dy: f64, dz: f64| solid.inside([q[0] + dx, q[1] + dy, q[2] + dz]);
-                if ins(0.0, 0.0, 0.0) && ins(d, 0.0, 0.0) && ins(-d, 0.0, 0.0) && ins(0.0, -d, 0.0) && ins(0.0, 0.0, d) && ins(0.0, 0.0, -d) {
+                if seed || interior.is_none() && ins(0.0, 0.0, 0.0) && ins(d, 0.0, 0.0) && ins(-d, 0.0, 0.0) && ins(0.0, -d, 0.0) && ins(0.0, d, 0.0) && ins(0.0, 0.0, d) && ins(0.0, 0.0, -d) {
                     if trace && m.leak_samples == 0 {
                         // walk back toward the outside and print the path as it crosses the skin
                         let mut k = k;
@@ -207,11 +272,16 @@ pub fn measure(placements: &[Placement], hull: &Hull) -> Metrics {
     m.leak_z = lz;
     // Q2: exposed faces
     let end_zone = 0.35 * p.length;
-    for poly in &polys {
+    for (bi, poly) in polys.iter().enumerate() {
         for (nrm, f) in &poly.faces {
             let k = f.len() as f64;
             let c = [0, 1, 2].map(|i| f.iter().map(|q| q[i]).sum::<f64>() / k);
-            if !ext_at([c[0] + nrm[0] * 0.3, c[1] + nrm[1] * 0.3, c[2] + nrm[2] * 0.3]) {
+            // exposed if the outside touches the face anywhere: probe the centroid and points toward each vertex
+            let mut probes = vec![c];
+            for q in f {
+                probes.push([0, 1, 2].map(|i| c[i] + 0.7 * (q[i] - c[i])));
+            }
+            if !probes.iter().any(|p| ext_at([p[0] + nrm[0] * 0.3, p[1] + nrm[1] * 0.3, p[2] + nrm[2] * 0.3])) {
                 continue;
             }
             // area (e² → m²)
@@ -223,15 +293,23 @@ pub fn measure(placements: &[Placement], hull: &Hull) -> Metrics {
                 cr[2] += u[0] * v[1] - u[1] * v[0];
             }
             let area = 0.5 * (cr[0] * cr[0] + cr[1] * cr[1] + cr[2] * cr[2]).sqrt() * 0.125 * 0.125;
+            let cm = to_m(c);
+            let fm: Vec<[f64; 3]> = f.iter().map(|q| to_m(*q)).collect();
             if nrm[1] > 0.9 {
+                m.faces.push((fm, *nrm, false, bi));
                 continue; // deck
             }
-            let cm = to_m(c);
             // the keel strip (centre column) is flat by symmetry: its target normal is straight down
             let sn = if cm[0].abs() < VOXEL * 0.5 && nrm[1] < -0.9 { Some([0.0, -1.0, 0.0]) } else { solid.normal([cm[0], cm[1].min(p.sheer(cm[2] / p.length + 0.5) - 0.2), cm[2]]) };
-            let Some(sn) = sn else { continue };
+            let Some(sn) = sn else {
+                m.faces.push((fm, *nrm, false, bi));
+                continue;
+            };
             let cos = nrm[0] * sn[0] + nrm[1] * sn[1] + nrm[2] * sn[2];
-            let step = cos < 25f64.to_radians().cos();
+            // a step is an exposed axis-aligned face (a ledge or a block corner) where the surface is sloped
+            let axis = nrm.iter().any(|c| c.abs() > 0.99);
+            let step = axis && cos < 25f64.to_radians().cos();
+            m.faces.push((fm, *nrm, step, bi));
             if cm[2].abs() > end_zone {
                 m.end_area += area;
                 if step {
