@@ -32,7 +32,7 @@ pub fn check(model: &Model, cat: &Catalogue) -> Vec<Diagnostic> {
         }
         let r = c.rotation;
         let det = r[0] * (r[4] * r[8] - r[5] * r[7]) - r[1] * (r[3] * r[8] - r[5] * r[6]) + r[2] * (r[3] * r[7] - r[4] * r[6]);
-        if det != 1 || r.iter().any(|x| x.abs() > 1) {
+        if det.abs() != 1 || r.iter().any(|x| x.abs() > 1) {
             bad_rot.push(*id);
             continue; // scaled / zero-size transforms (XML edits) have no well-defined voxel footprint
         }

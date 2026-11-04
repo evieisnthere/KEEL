@@ -92,7 +92,8 @@ fn user_scale_matches_workshop_form() {
     let mut m = Model::parse(SRC).unwrap();
     let id = [CompId { body: 0, comp: 1 }];
     m.set_scale(&id, [1, 5, 1]);
-    assert!(m.to_xml().contains("r=\"1,0,0,0,5,0,0,0,1\""));
+    // no `r` = the game default (a mirror); scaling multiplies its columns
+    assert!(m.to_xml().contains("r=\"0,0,-1,-5,0,0,0,-1,0\""), "{}", m.to_xml());
     m.rotate_quarter(&id, 0, [2, 0, 0]);
     assert_eq!(Model::scale_of(&m.components()[1].1.rotation), [1, 5, 1]);
     m.set_scale(&id, [1, 1, 1]);
