@@ -4,6 +4,9 @@ use crate::xml::{Document, Element};
 
 pub const DEFAULT_DEFINITION: &str = "01_block";
 pub const IDENTITY: [i32; 9] = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+/// Rotation the game uses when a component has no `r` attribute (E2: in-game render test; also what community
+/// tools assume). Local -z maps to world +y, so long blocks stand upright by default.
+pub const DEFAULT_ROTATION: [i32; 9] = [0, 0, -1, -1, 0, 0, 0, -1, 0];
 pub const GRID_M: f64 = 0.25;
 
 fn vec3(el: Option<&Element>) -> [i32; 3] {
@@ -47,10 +50,10 @@ impl<'a> ComponentRef<'a> {
                     r.copy_from_slice(&v);
                     r
                 } else {
-                    IDENTITY
+                    DEFAULT_ROTATION
                 }
             }
-            None => IDENTITY,
+            None => DEFAULT_ROTATION,
         }
     }
 }

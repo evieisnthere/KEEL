@@ -202,7 +202,7 @@ def vehicle_bodies(vehicle_xml):
                 continue
             vp = o.find('vp')
             pos = tuple(int(vp.get(a, 0)) for a in 'xyz') if vp is not None else (0, 0, 0)
-            R = [int(x) for x in o.get('r', '1,0,0,0,1,0,0,0,1').split(',')]
+            R = [int(x) for x in o.get('r', '0,0,-1,-1,0,0,0,-1,0')  # game default when r is absent (E2).split(',')]
             comps.append((c.get('d', '01_block'), pos, R))
         yield b.get('unique_id'), comps
 

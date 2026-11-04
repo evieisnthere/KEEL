@@ -1,6 +1,6 @@
 //! Editable vehicle on top of the lossless XML tree. Every edit touches only the elements it changes, so unknown data
 //! survives (plan exit criterion). Undo/redo snapshots the document (vehicles are at most a few MB).
-use keel_io::vehicle::IDENTITY;
+use keel_io::vehicle::{DEFAULT_ROTATION, IDENTITY};
 use keel_io::xml::{self, Document, Element, Node};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -49,7 +49,7 @@ fn rot_of(o: &Element) -> [i32; 9] {
                 r
             })
         })
-        .unwrap_or(IDENTITY)
+        .unwrap_or(DEFAULT_ROTATION)
 }
 
 /// M[i][j] = r[3j + i]; world = M·v (keel_io::vehicle::rotate).
@@ -223,7 +223,7 @@ impl Model {
         for &id in ids {
             if let Some(o) = self.comp_mut(id).and_then(|c| c.find_mut("o")) {
                 let r = unmat(&mul(&q, &mat(&rot_of(o))));
-                if r == IDENTITY {
+                if r == DEFAULT_ROTATION {
                     o.remove_attr("r");
                 } else {
                     o.set("r", &r.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(","));
@@ -266,7 +266,7 @@ impl Model {
                         r[3 * j + i] = unit[i] * scale[j];
                     }
                 }
-                if r == IDENTITY {
+                if r == DEFAULT_ROTATION {
                     o.remove_attr("r");
                 } else {
                     o.set("r", &r.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(","));
@@ -342,7 +342,7 @@ impl Model {
             c.set("d", def);
         }
         let mut o = Element::new("o");
-        if rotation != IDENTITY {
+        if rotation != DEFAULT_ROTATION {
             o.set("r", &rotation.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(","));
         }
         o.set("sc", "6,x,x,x,x,x,x");

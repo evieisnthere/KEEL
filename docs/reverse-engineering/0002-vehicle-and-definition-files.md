@@ -71,3 +71,17 @@ Structural blocks (wedges, pyramids…) have **no mesh**. They are drawn from th
 1. Coordinate convention: compare `vp` and `r` against definition voxel extents on a few known shapes.
 2. Lossless round-trip: parse → write all ~95 files and compare semantically (attribute order and whitespace may differ).
 3. Compute mass, COM and buoyancy volume for each vehicle from the definitions. This is the input to S0 hydrostatics.
+
+## Component transforms and paint: confirmed by the in-game render test (2026-11-04, E2)
+
+Test vehicle: `tools/fixtures/make_render_test.py`, screenshots supplied by the product owner.
+
+* **A component without `r` uses `0,0,-1,-1,0,0,0,-1,0`, not identity.** This default has determinant −1, so it is a
+  mirror. Local −z maps to world +y, so long blocks (1x4 wedges, 4x4 pyramids) stand upright. Explicit `r` values are
+  proper rotations in the same column-major convention (`world = M·v`, `M[i][j] = r[3j+i]`).
+* The world is left-handed (x starboard, y up, z forward). Renderers must mirror one axis to display it.
+* `sc` = surface paint in **definition surface order** (count first; `x` = use `bc`). Mesh paint keys: (255,125,0) → `bc`,
+  (154,125,0) → `bc2`, (55,125,0) → `bc3`. `ac` is the light/indicator colour.
+* Block solids follow the definition surfaces. 1-wide pyramids put their triangular faces on +x/+z, mirrored relative to
+  the collision hulls in `0x14031ab90`.
+* Paintable signs: `gc` holds 9x9 pixels (row-major) on the part's ±y faces.

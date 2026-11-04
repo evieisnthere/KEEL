@@ -43,7 +43,7 @@ def extract(vehicle_path, defs):
             if o is None:
                 continue
             d = c.get('d', '01_block'); vp = _v(o.find('vp'))
-            R = [int(x) for x in o.get('r', '1,0,0,0,1,0,0,0,1').split(',')]
+            R = [int(x) for x in o.get('r', '0,0,-1,-1,0,0,0,-1,0')  # game default when r is absent (E2).split(',')]
             comps.append((bid, len(comps), d, vp, R, o))
     vox = {}; ends = collections.defaultdict(list)   # (body, voxel) -> comp ; (body, voxel, dir) openings/ports
     ports = []

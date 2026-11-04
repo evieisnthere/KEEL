@@ -29,9 +29,17 @@ fn rotate_four_times_is_identity() {
     }
     let c = &m.components()[0].1;
     assert_eq!(c.voxel, [1, 0, 0]);
-    assert_eq!(c.rotation, keel_io::vehicle::IDENTITY);
+    assert_eq!(c.rotation, keel_io::vehicle::DEFAULT_ROTATION);
     m.rotate_quarter(&ids, 1, [0, 0, 0]);
     assert_eq!(m.components()[0].1.voxel, [0, 0, -1]);
+    // a component without `r` uses the game default, and turning back to it removes the attribute again
+    let src = "<vehicle><bodies><body><components><c><o><vp/></o></c></components></body></bodies></vehicle>";
+    let mut m = Model::parse(src).unwrap();
+    assert_eq!(m.components()[0].1.rotation, keel_io::vehicle::DEFAULT_ROTATION);
+    for _ in 0..4 {
+        m.rotate_quarter(&[CompId { body: 0, comp: 0 }], 2, [0, 0, 0]);
+    }
+    assert_eq!(m.to_xml(), src.replace("<o>", "<o>"));
 }
 
 #[test]

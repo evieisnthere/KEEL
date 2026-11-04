@@ -422,7 +422,7 @@ pub fn pairing_stats(model: &Model, cat: &Catalogue) -> (usize, usize) {
     let asym: std::collections::HashSet<CompId> = model
         .components()
         .into_iter()
-        .filter(|(_, c)| { let r = c.rotation; (std::env::var_os("KEEL_DEBUG_SLOPES").is_some() || (0..3).any(|i| (0..3).any(|j| r[3 * i + j] != r[3 * j + i]))) && r.iter().all(|x| x.abs() <= 1) && !c.attrs.contains_key("gc") && cat.get(&c.def).is_some_and(|d| d.mesh_data_name.is_empty() && !d.surfaces.is_empty() && (std::env::var_os("KEEL_DEBUG_SLOPES").is_none() || std::env::var("KEEL_DEBUG_SLOPES").unwrap().split(',').any(|b| b.parse::<i32>().ok() == Some(d.block_type)))) })
+        .filter(|(_, c)| { let r = c.rotation; (std::env::var_os("KEEL_DEBUG_SLOPES").is_some() || std::env::var_os("KEEL_DEBUG_ALL").is_some() || (0..3).any(|i| (0..3).any(|j| r[3 * i + j] != r[3 * j + i]))) && r.iter().all(|x| x.abs() <= 1) && !c.attrs.contains_key("gc") && cat.get(&c.def).is_some_and(|d| d.mesh_data_name.is_empty() && !d.surfaces.is_empty() && (std::env::var_os("KEEL_DEBUG_SLOPES").is_none() || std::env::var("KEEL_DEBUG_SLOPES").unwrap().split(',').any(|b| b.parse::<i32>().ok() == Some(d.block_type)))) })
         .map(|(id, _)| id)
         .collect();
     let mut tmp = MeshLibrary::default();
