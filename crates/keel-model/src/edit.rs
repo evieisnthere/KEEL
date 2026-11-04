@@ -387,6 +387,11 @@ impl Model {
     /// Apply a generated build as one undo step: remove the components listed in `remove` (def, voxel, rotation), add
     /// `parts` and the wires `links`. Returns (removed, added parts, added links).
     pub fn apply_build(&mut self, body: usize, remove: &[(String, [i32; 3], [i32; 9])], parts: &[GenPart], links: &[GenLink]) -> (usize, usize, usize) {
+        self.apply_build_replacing(body, remove, &[], parts, links)
+    }
+
+    /// As [`Model::apply_build`], also removing the wires `remove_links` (a previous generation's).
+    pub fn apply_build_replacing(&mut self, body: usize, remove: &[(String, [i32; 3], [i32; 9])], remove_links: &[GenLink], parts: &[GenPart], links: &[GenLink]) -> (usize, usize, usize) {
         if self.components_el_mut(body).is_none() {
             return (0, 0, 0);
         }
@@ -414,7 +419,24 @@ impl Model {
             }
         }
         let mut nl = 0;
+        if self.doc.root.find("logic_node_links").is_none() {
+            self.doc.root.push(Element::new("logic_node_links"));
+        }
         if let Some(ls) = self.doc.root.find_mut("logic_node_links") {
+            if !remove_links.is_empty() {
+                let pos = |e: &Element, tag: &str| -> [i32; 3] {
+                    let p = e.find(tag);
+                    [0, 1, 2].map(|i| p.and_then(|p| p.get(["x", "y", "z"][i])).and_then(|v| v.parse().ok()).unwrap_or(0))
+                };
+                let gone: std::collections::HashSet<(i32, [i32; 3], [i32; 3])> = remove_links.iter().map(|l| (l.kind, l.a, l.b)).collect();
+                ls.children.retain(|c| match c {
+                    keel_io::xml::Node::Element(e) if e.tag == "logic_node_link" => {
+                        let k = e.get("type").and_then(|v| v.parse().ok()).unwrap_or(0);
+                        !gone.contains(&(k, pos(e, "voxel_pos_0"), pos(e, "voxel_pos_1")))
+                    }
+                    _ => true,
+                });
+            }
             for l in links {
                 let mut e = Element::new("logic_node_link");
                 e.set("type", &l.kind.to_string());

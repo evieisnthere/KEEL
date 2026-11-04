@@ -88,6 +88,8 @@ pub struct HullBlocks {
     pub sources: Vec<&'static str>,
     /// every voxel covered by a placement (vehicle voxels, origin applied)
     pub occupied: std::collections::HashSet<[i32; 3]>,
+    /// the voxel origin the hull was built at (midship baseline)
+    pub origin: [i32; 3],
 }
 
 impl HullBlocks {
@@ -296,7 +298,7 @@ pub fn build(hull: &Hull, opt: &HullBlockOptions) -> HullBlocks {
     for p in out.iter_mut() {
         p.vp = [p.vp[0] + o[0], p.vp[1] + o[1], p.vp[2] + o[2]];
     }
-    HullBlocks { placements: out, model, unmatched: 0, sources, occupied }
+    HullBlocks { placements: out, model, unmatched: 0, sources, occupied, origin: opt.origin }
 }
 
 #[cfg(test)]

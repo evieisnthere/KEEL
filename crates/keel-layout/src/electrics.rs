@@ -124,7 +124,7 @@ pub fn wire(plan: &Plan, used: &HashSet<[i32; 3]>, opt: &LightingOptions) -> (Bu
     order.extend(plan.rooms.iter().filter(|r| !matches!(r.kind, RoomKind::Electrical | RoomKind::EngineRoom)));
     let Some(pr) = order.first().copied() else { return (b, circuits) };
     let mut taken: HashSet<[i32; 3]> = used.clone();
-    let mut slot = |taken: &mut HashSet<[i32; 3]>| -> Option<[i32; 3]> {
+    let slot = |taken: &mut HashSet<[i32; 3]>| -> Option<[i32; 3]> {
         for r in &order {
             let y = plan.decks[r.deck].floor_y + 1;
             let near_door = |x: i32, z: i32| r.doors.iter().any(|d| d.cells.iter().any(|c| (c.0 - x).abs() <= 2 && (c.1 - z).abs() <= 2));

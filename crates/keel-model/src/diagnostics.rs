@@ -83,5 +83,51 @@ pub fn check(model: &Model, cat: &Catalogue) -> Vec<Diagnostic> {
         components: vec![],
     });
     out.sort_by(|a, b| b.severity.cmp(&a.severity));
+    let wires = wire_problems(model, cat);
+    if !wires.is_empty() {
+        out.push(Diagnostic {
+            severity: Severity::Warning,
+            code: "dangling-wire",
+            message: format!("{} wire end(s) do not land on a port of their type, e.g. {}", wires.len(), wires[0].2),
+            components: vec![],
+        });
+    }
+    out
+}
+
+/// Wires whose ends do not land on a port of the wire's type: (link index, end voxel, reason).
+pub fn wire_problems(model: &Model, cat: &Catalogue) -> Vec<(usize, [i32; 3], String)> {
+    use crate::edit::port_voxel;
+    let mut ports: HashMap<([i32; 3], i32), Vec<i32>> = HashMap::new();
+    for (_, c) in model.components() {
+        let Some(d) = cat.get(&c.def) else { continue };
+        for n in &d.logic_nodes {
+            ports.entry((port_voxel(c.voxel, &c.rotation, n.position), n.kind)).or_default().push(n.mode);
+        }
+    }
+    let mut out = vec![];
+    let Some(ls) = model.doc.root.find("logic_node_links") else { return out };
+    for (i, e) in ls.elements().filter(|e| e.tag == "logic_node_link").enumerate() {
+        let kind: i32 = e.get("type").and_then(|v| v.parse().ok()).unwrap_or(0);
+        let pos = |tag: &str| -> [i32; 3] {
+            let p = e.find(tag);
+            [0, 1, 2].map(|k| p.and_then(|p| p.get(["x", "y", "z"][k])).and_then(|v| v.parse().ok()).unwrap_or(0))
+        };
+        let (a, b) = (pos("voxel_pos_0"), pos("voxel_pos_1"));
+        for v in [a, b] {
+            if !ports.contains_key(&(v, kind)) {
+                out.push((i, v, format!("no type-{kind} port at {v:?}")));
+            }
+        }
+        // logic and number wires join an output to an input
+        if kind <= 1 {
+            if let (Some(ma), Some(mb)) = (ports.get(&(a, kind)), ports.get(&(b, kind))) {
+                let has = |m: &Vec<i32>, x: i32| m.contains(&x);
+                if !((has(ma, 0) && has(mb, 1)) || (has(ma, 1) && has(mb, 0))) {
+                    out.push((i, a, "logic wire does not join an output to an input".into()));
+                }
+            }
+        }
+    }
     out
 }

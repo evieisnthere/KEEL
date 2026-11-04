@@ -166,7 +166,7 @@ impl RoomKind {
 }
 
 /// One line of a programme: `count` rooms of `kind`, each of at least `area` m².
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RoomReq {
     pub kind: RoomKind,
     pub count: usize,
@@ -178,7 +178,7 @@ pub struct RoomReq {
 }
 
 /// Size inputs for a programme.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProgrammeInput {
     pub boat: BoatType,
     pub length: f64,

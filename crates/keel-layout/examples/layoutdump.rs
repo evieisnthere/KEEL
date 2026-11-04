@@ -19,6 +19,7 @@ fn main() {
     let opt = LayoutOptions {
         programme: programme::ProgrammeInput { boat, length: h.params.length, beam: h.params.beam, crew: 0, passengers: 0 },
         hull_floors: None,
+        rooms: None,
         superstructure: Some(s),
         plan: Default::default(),
         finish: Default::default(),

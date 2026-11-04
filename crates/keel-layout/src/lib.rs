@@ -29,6 +29,8 @@ pub struct LayoutOptions {
     pub programme: programme::ProgrammeInput,
     /// hull deck floor rows (None = suggested: every 9 rows down from the weather deck)
     pub hull_floors: Option<Vec<i32>>,
+    /// an edited room programme (None = the boat type's default for this size)
+    pub rooms: Option<Vec<programme::RoomReq>>,
     pub superstructure: Option<superstructure::Superstructure>,
     pub plan: plan::PlanOptions,
     pub finish: structure::Finish,
@@ -45,7 +47,7 @@ pub struct Layout {
 
 /// Weather deck plating row at midships for a built hull.
 pub fn deck_row(hull: &HullBlocks) -> i32 {
-    keel_geom::lattice::path_height(&hull.model.sheer, 0.5).floor() as i32 - 1
+    keel_geom::lattice::path_height(&hull.model.sheer, 0.5).floor() as i32 - 1 + hull.origin[1]
 }
 
 /// The interior space of a built hull: inside test, bounds and the weather deck row.
@@ -64,7 +66,8 @@ impl<'a> HullSpace<'a> {
         HullSpace { hull, lo, hi, deck_y: deck_row(hull) }
     }
     pub fn inside(&self, v: [i32; 3]) -> bool {
-        self.hull.model_inside_m([v[0] as f64 * VOXEL, (v[1] as f64 + 0.5) * VOXEL, v[2] as f64 * VOXEL])
+        let o = self.hull.origin;
+        self.hull.model_inside_m([(v[0] - o[0]) as f64 * VOXEL, (v[1] - o[1]) as f64 * VOXEL + 0.5 * VOXEL, (v[2] - o[2]) as f64 * VOXEL])
     }
     pub fn with<R>(&self, f: impl FnOnce(&space::Interior) -> R) -> R {
         let inside = |v: [i32; 3]| self.inside(v);
@@ -88,7 +91,14 @@ pub fn plan_only(hull: &HullBlocks, opt: &LayoutOptions) -> plan::Plan {
     if let Some(s) = &opt.superstructure {
         decks.extend(space::superstructure_decks(s, &hull.occupied));
     }
-    plan::make_plan(decks, &programme::programme(&opt.programme), &opt.plan)
+    plan::make_plan(decks, &opt.room_list(), &opt.plan)
+}
+
+impl LayoutOptions {
+    /// The room programme in use.
+    pub fn room_list(&self) -> Vec<programme::RoomReq> {
+        self.rooms.clone().unwrap_or_else(|| programme::programme(&self.programme))
+    }
 }
 
 /// Generate the interior (and superstructure) for a built hull.
@@ -106,7 +116,7 @@ pub fn generate(hull: &HullBlocks, opt: &LayoutOptions) -> Layout {
         decks.extend(space::superstructure_decks(s, &occ));
         build.extend(sb);
     }
-    let prog = programme::programme(&opt.programme);
+    let prog = opt.room_list();
     let plan = plan::make_plan(decks, &prog, &opt.plan);
     build.extend(structure::build_structure(&plan, &opt.finish));
     let (fb, used) = furnish::furnish(&plan);
@@ -131,6 +141,7 @@ mod tests {
         let opt = LayoutOptions {
             programme: programme::ProgrammeInput { boat: programme::BoatType::Workboat, length: h.params.length, beam: h.params.beam, crew: 0, passengers: 0 },
             hull_floors: None,
+            rooms: None,
             superstructure: Some(s),
             plan: Default::default(),
             finish: Default::default(),
@@ -154,4 +165,56 @@ mod tests {
         let dups: Vec<_> = l.build.parts.iter().filter(|p| !seen.insert(p.vp)).map(|p| (p.def.clone(), p.vp)).collect();
         assert!(dups.is_empty(), "{} duplicates, e.g. {:?}", dups.len(), &dups[..dups.len().min(8)]);
     }
+
+    #[test]
+    fn regenerating_replaces_parts_and_wires() {
+        let h = HullParams::default().build().unwrap();
+        let hb = keel_geom::hullblocks::build(&h, &Default::default());
+        let opt = LayoutOptions {
+            programme: programme::ProgrammeInput { boat: programme::BoatType::Tug, length: h.params.length, beam: h.params.beam, crew: 0, passengers: 0 },
+            hull_floors: None,
+            rooms: None,
+            superstructure: None,
+            plan: Default::default(),
+            finish: Default::default(),
+            lighting: Default::default(),
+        };
+        let l = generate(&hb, &opt);
+        let mut m = keel_model::Model::new_empty();
+        let (_, a1, l1) = m.apply_build(0, &[], &l.build.parts, &l.build.links);
+        let n1 = m.components().len();
+        let rem: Vec<_> = l.build.parts.iter().map(|p| (p.def.clone(), p.vp, p.r)).collect();
+        let (r2, a2, l2) = m.apply_build_replacing(0, &rem, &l.build.links, &l.build.parts, &l.build.links);
+        assert_eq!((a1, l1), (a2, l2));
+        assert_eq!(r2, a1);
+        assert_eq!(m.components().len(), n1);
+        let links = m.to_xml().matches("<logic_node_link ").count();
+        assert_eq!(links, l1);
+    }
+
+    /// With the game's definitions (KEEL_DEFINITIONS), every generated wire must land on a port of its type.
+    #[test]
+    fn generated_wires_land_on_ports() {
+        let Some(dir) = std::env::var_os("KEEL_DEFINITIONS") else { return };
+        let cat = keel_model::catalogue::Catalogue::load_dir(std::path::Path::new(&dir)).unwrap();
+        let h = HullParams::default().build().unwrap();
+        let hb = keel_geom::hullblocks::build(&h, &Default::default());
+        let half = (h.params.beam / 2.0 / VOXEL) as i32;
+        let zl = (h.params.length / 2.0 / VOXEL) as i32;
+        let opt = LayoutOptions {
+            programme: programme::ProgrammeInput { boat: programme::BoatType::Workboat, length: h.params.length, beam: h.params.beam, crew: 0, passengers: 0 },
+            hull_floors: None,
+            rooms: None,
+            superstructure: Some(superstructure::Superstructure::default_for(deck_row(&hb), half, -zl, zl, 2)),
+            plan: Default::default(),
+            finish: Default::default(),
+            lighting: Default::default(),
+        };
+        let l = generate(&hb, &opt);
+        let mut m = keel_model::Model::new_empty();
+        m.apply_build(0, &[], &l.build.parts, &l.build.links);
+        let bad = keel_model::diagnostics::wire_problems(&m, &cat);
+        assert!(bad.is_empty(), "{} bad wire ends, e.g. {:?}", bad.len(), &bad[..bad.len().min(10)]);
+    }
 }
+

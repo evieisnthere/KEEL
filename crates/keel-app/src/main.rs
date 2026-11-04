@@ -2,6 +2,7 @@
 //!
 //! Usage: `keel [vehicle.xml] [--defs <rom/data/definitions>]`. The definitions folder is remembered in the settings file.
 mod design;
+mod interior;
 mod settings;
 mod theme;
 mod viewport;
@@ -55,6 +56,7 @@ struct KeelApp {
     look: Option<[f32; 3]>,
     mode: Mode,
     design: design::Design,
+    interior: interior::Interior,
     frame_next_hull: bool,
     bake_on_start: bool,
 }
@@ -100,6 +102,7 @@ impl KeelApp {
             look: args.look,
             mode: match args.mode.as_deref() { Some("hull") => Mode::Hull, Some("decks") => Mode::Decks, _ => Mode::Build },
             design: design::Design::default(),
+            interior: interior::Interior::with_docked(args.plan_docked),
             frame_next_hull: true,
             bake_on_start: args.bake,
             settings,
@@ -145,6 +148,7 @@ impl KeelApp {
                 self.status = format!("Opened {}", p.display());
                 self.settings.push_recent(&p);
                 self.design.doc = design::Design::load_for(&p);
+                self.interior.doc = self.design.doc.interior.clone();
                 self.path = Some(p);
                 self.faces_gen = u64::MAX;
                 self.frame_next = true;
@@ -156,6 +160,7 @@ impl KeelApp {
     fn save(&mut self, p: PathBuf) {
         match std::fs::write(&p, self.model.to_xml()) {
             Ok(()) => {
+                self.design.doc.interior = self.interior.doc.clone();
                 self.design.save_for(&p);
                 self.model.dirty = false;
                 self.status = format!("Saved {}", p.display());
@@ -507,9 +512,15 @@ impl KeelApp {
         self.status = format!("Hull baked: {a} blocks added, {r} previous hull blocks removed (one undo step)");
     }
 
-    fn decks_panel(&mut self, ui: &mut egui::Ui) {
-        theme::section(ui, "Decks & floor plan");
-        ui.label("Deck planning arrives in the next step: decks at heights, rooms, and generated floors, walls, doors and railings inside the hull.");
+    fn apply_interior(&mut self, g: interior::Generated) {
+        use keel_model::edit::GenLink;
+        let rem = std::mem::take(&mut self.interior.doc.generated);
+        let rem_links: Vec<GenLink> = std::mem::take(&mut self.interior.doc.generated_links).into_iter().map(|(kind, a, b)| GenLink { kind, a, b }).collect();
+        let b = &g.layout.build;
+        let (r, a, l) = self.model.apply_build_replacing(0, &rem, &rem_links, &b.parts, &b.links);
+        self.interior.doc.generated = b.parts.iter().map(|p| (p.def.clone(), p.vp, p.r)).collect();
+        self.interior.doc.generated_links = b.links.iter().map(|l| (l.kind, l.a, l.b)).collect();
+        self.status = format!("Interior generated: {a} parts and {l} wires added, {r} previous parts removed (one undo step); {} lighting circuits", g.layout.circuits.len());
     }
 
     fn left_panel(&mut self, ui: &mut egui::Ui) {
@@ -732,16 +743,26 @@ impl eframe::App for KeelApp {
                 });
             });
             let mut bake = None;
+            let mut generated = None;
             egui::Panel::left("left").frame(theme::side_frame()).default_size(300.0).show(ui, |ui| match self.mode {
                 Mode::Build => self.left_panel(ui),
                 Mode::Hull => {
                     self.design.refresh();
                     bake = self.design.params_ui(ui);
                 }
-                Mode::Decks => self.decks_panel(ui),
+                Mode::Decks => {
+                    self.design.refresh();
+                    self.interior.refresh(self.design.hull.as_ref(), &self.design.doc.hull, self.design.doc.origin);
+                    if let Some(g) = self.interior.panel_ui(ui) {
+                        generated = Some(g);
+                    }
+                }
             });
             if let Some(b) = bake {
                 self.apply_bake(b);
+            }
+            if let Some(g) = generated {
+                self.apply_interior(g);
             }
             egui::Panel::right("right").frame(theme::side_frame()).default_size(310.0).show(ui, |ui| {
                 if self.mode == Mode::Hull {
@@ -750,6 +771,14 @@ impl eframe::App for KeelApp {
                 }
                 self.right_panel(ui)
             });
+        }
+        if self.mode == Mode::Decks {
+            self.interior.refresh(self.design.hull.as_ref(), &self.design.doc.hull, self.design.doc.origin);
+            self.interior.plan_window(&ctx);
+            if self.interior.docked {
+                egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| self.interior.plan_ui(ui));
+                return;
+            }
         }
         egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| {
             let rect = ui.available_rect_before_wrap();
@@ -825,14 +854,17 @@ struct Args {
     look: Option<[f32; 3]>,
     mode: Option<String>,
     bake: bool,
+    plan_docked: bool,
 }
 
 fn parse_args() -> Args {
-    let mut a = Args { vehicle: None, defs: None, rom: None, view: None, clean: false, zoom: 1.0, look: None, mode: None, bake: false };
+    let mut a = Args { vehicle: None, defs: None, rom: None, view: None, clean: false, zoom: 1.0, look: None, mode: None, bake: false, plan_docked: false };
     let mut it = std::env::args().skip(1);
     while let Some(x) = it.next() {
         if x == "--defs" {
             a.defs = it.next().map(PathBuf::from);
+        } else if x == "--plan-docked" {
+            a.plan_docked = true;
         } else if x == "--bake-hull" {
             a.bake = true;
         } else if x == "--mode" {

@@ -17,6 +17,8 @@ pub enum Cell {
     Corridor,
     Core,
     Wall,
+    /// unused space behind walls (not built)
+    Void,
 }
 
 #[derive(Debug, Clone)]
@@ -225,7 +227,7 @@ fn lay_deck(deck: &Deck, di: usize, wants: &[Want], core: Option<(i32, i32, i32,
         }
         rooms.push(Room { id, kind: w.kind, deck: di, cells, doors: vec![], switch_at: None });
     }
-    // corridor: the remaining centre cells; side strips left over become walls (closed voids)
+    // corridor: the remaining centre cells; side strips left over are empty voids behind the corridor wall
     for &(x, z) in &deck.cells {
         if grid.contains_key(&(x, z)) {
             continue;
@@ -237,7 +239,7 @@ fn lay_deck(deck: &Deck, di: usize, wants: &[Want], core: Option<(i32, i32, i32,
         } else if !corridor {
             Cell::Corridor
         } else {
-            Cell::Wall
+            Cell::Void
         };
         grid.insert((x, z), c);
     }
