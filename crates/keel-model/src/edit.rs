@@ -3,6 +3,30 @@
 use keel_io::vehicle::{DEFAULT_ROTATION, IDENTITY};
 use keel_io::xml::{self, Document, Element, Node};
 
+/// World voxel of a port at `pos` (component-local) on a component at `vp` with rotation `r` (column-major,
+/// M[i][j] = r[3j + i], as everywhere in KEEL).
+pub fn port_voxel(vp: [i32; 3], r: &[i32; 9], pos: [i32; 3]) -> [i32; 3] {
+    [0, 1, 2].map(|i| vp[i] + r[i] * pos[0] + r[3 + i] * pos[1] + r[6 + i] * pos[2])
+}
+
+/// A generated part: definition, voxel, rotation and optional paint (`bc` block colour, `ac` additive / light colour).
+#[derive(Debug, Clone, PartialEq)]
+pub struct GenPart {
+    pub def: String,
+    pub vp: [i32; 3],
+    pub r: [i32; 9],
+    pub bc: Option<String>,
+    pub ac: Option<String>,
+}
+
+/// A generated wire (`logic_node_link`) between two port voxels. `kind` as in [`crate::catalogue::LogicNode`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct GenLink {
+    pub kind: i32,
+    pub a: [i32; 3],
+    pub b: [i32; 3],
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CompId {
     pub body: usize,
@@ -360,6 +384,62 @@ impl Model {
         (removed, added)
     }
 
+    /// Apply a generated build as one undo step: remove the components listed in `remove` (def, voxel, rotation), add
+    /// `parts` and the wires `links`. Returns (removed, added parts, added links).
+    pub fn apply_build(&mut self, body: usize, remove: &[(String, [i32; 3], [i32; 9])], parts: &[GenPart], links: &[GenLink]) -> (usize, usize, usize) {
+        if self.components_el_mut(body).is_none() {
+            return (0, 0, 0);
+        }
+        self.checkpoint();
+        let want: std::collections::HashSet<(String, [i32; 3], [i32; 9])> = remove.iter().cloned().collect();
+        let ids: Vec<CompId> = self
+            .components()
+            .into_iter()
+            .filter(|(id, c)| id.body == body && want.contains(&(c.def.clone(), c.voxel, c.rotation)))
+            .map(|(id, _)| id)
+            .collect();
+        let removed = ids.len();
+        let undo_len = self.undo.len();
+        self.delete(&ids);
+        self.undo.truncate(undo_len);
+        let mut added = 0;
+        for p in parts {
+            if let Some(id) = self.add_inner(body, &p.def, p.vp, p.r, p.bc.as_deref()) {
+                added += 1;
+                if let Some(ac) = &p.ac {
+                    if let Some(o) = self.component_o_mut(id) {
+                        o.set("ac", ac);
+                    }
+                }
+            }
+        }
+        let mut nl = 0;
+        if let Some(ls) = self.doc.root.find_mut("logic_node_links") {
+            for l in links {
+                let mut e = Element::new("logic_node_link");
+                e.set("type", &l.kind.to_string());
+                for (tag, v) in [("voxel_pos_0", l.a), ("voxel_pos_1", l.b)] {
+                    let mut p = Element::new(tag);
+                    for (i, a) in ["x", "y", "z"].iter().enumerate() {
+                        if v[i] != 0 {
+                            p.set(a, &v[i].to_string());
+                        }
+                    }
+                    e.push(p);
+                }
+                ls.push(e);
+                nl += 1;
+            }
+        }
+        self.generation += 1;
+        (removed, added, nl)
+    }
+
+    fn component_o_mut(&mut self, id: CompId) -> Option<&mut Element> {
+        let cs = self.components_el_mut(id.body)?;
+        cs.elements_mut().filter(|e| e.tag == "c").nth(id.comp)?.find_mut("o")
+    }
+
     /// Add a new component of definition `def` at voxel `vp` (body `body`).
     pub fn add(&mut self, body: usize, def: &str, vp: [i32; 3], rotation: [i32; 9]) -> Option<CompId> {
         self.components_el_mut(body)?;
@@ -395,3 +475,33 @@ impl Model {
         Some(CompId { body, comp: n })
     }
 }
+
+#[cfg(test)]
+mod apply_build_tests {
+    use super::*;
+
+    #[test]
+    fn apply_build_adds_parts_paint_and_links_in_one_undo_step() {
+        let mut m = Model::new_empty();
+        let parts = vec![
+            GenPart { def: "small_light".into(), vp: [1, 2, 3], r: IDENTITY, bc: None, ac: Some("FFD9A0".into()) },
+            GenPart { def: "button_push".into(), vp: [0, 2, 3], r: IDENTITY, bc: None, ac: None },
+        ];
+        let links = vec![GenLink { kind: 0, a: [0, 2, 3], b: [1, 2, 3] }];
+        let (_, added, nl) = m.apply_build(0, &[], &parts, &links);
+        assert_eq!((added, nl), (2, 1));
+        let x = m.to_xml();
+        assert!(x.contains("ac=\"FFD9A0\""), "{x}");
+        assert!(x.contains("<logic_node_link type=\"0\">"), "{x}");
+        assert!(m.undo());
+        assert!(!m.to_xml().contains("small_light"));
+    }
+
+    #[test]
+    fn port_voxel_rotates_column_major() {
+        // quarter turn about y: local +x maps to world -z
+        let r = [0, 0, -1, 0, 1, 0, 1, 0, 0];
+        assert_eq!(port_voxel([5, 0, 0], &r, [1, 0, 0]), [5, 0, -1]);
+    }
+}
+

@@ -86,6 +86,8 @@ pub struct HullBlocks {
     pub unmatched: usize,
     /// how each placement was chosen: "long", "unit" or "cube" (debugging)
     pub sources: Vec<&'static str>,
+    /// every voxel covered by a placement (vehicle voxels, origin applied)
+    pub occupied: std::collections::HashSet<[i32; 3]>,
 }
 
 impl HullBlocks {
@@ -272,7 +274,12 @@ pub fn build(hull: &Hull, opt: &HullBlockOptions) -> HullBlocks {
     let tiles = crate::tiling::tile(&|e| inside8(e), &shell, &cube_veto, &allowed, &align);
     let mut out: Vec<Placement> = vec![];
     let mut sources: Vec<&'static str> = vec![];
+    let mut occupied: std::collections::HashSet<[i32; 3]> = Default::default();
     for (pl, cells) in tiles {
+        for c in &cells {
+            occupied.insert([c[0] + opt.origin[0], c[1] + opt.origin[1], c[2] + opt.origin[2]]);
+            occupied.insert([-c[0] + opt.origin[0], c[1] + opt.origin[1], c[2] + opt.origin[2]]);
+        }
         let src: &'static str = if pl.def == "01_block" { "cube" } else if cells.len() > 1 { "long" } else { "unit" };
         if cells.iter().all(|c| c[0] >= 1) {
             let mut r = pl.r;
@@ -289,7 +296,7 @@ pub fn build(hull: &Hull, opt: &HullBlockOptions) -> HullBlocks {
     for p in out.iter_mut() {
         p.vp = [p.vp[0] + o[0], p.vp[1] + o[1], p.vp[2] + o[2]];
     }
-    HullBlocks { placements: out, model, unmatched: 0, sources }
+    HullBlocks { placements: out, model, unmatched: 0, sources, occupied }
 }
 
 #[cfg(test)]

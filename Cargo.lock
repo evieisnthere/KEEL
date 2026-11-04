@@ -1059,11 +1059,29 @@ name = "keel-io"
 version = "0.1.0"
 
 [[package]]
+name = "keel-layout"
+version = "0.1.0"
+dependencies = [
+ "keel-geom",
+ "keel-io",
+ "keel-model",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "keel-model"
 version = "0.1.0"
 dependencies = [
  "keel-io",
  "serde_json",
+]
+
+[[package]]
+name = "keel-power"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

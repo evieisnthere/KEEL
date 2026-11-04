@@ -15,16 +15,25 @@ def main():
     out = a[1]
     focus = None
     bytype = '--bytype' in a
+    paint = '--paint' in a
+    cut = None
     views = [(20, 15), (60, 30), (160, -25), (200, -20), (90, 0), (0, -89)]
     i = 2
     while i < len(a):
         if a[i] == '--focus':
             focus = tuple(float(v) for v in a[i + 1].split(',')); i += 2
+        elif a[i] == '--cut':
+            cut = a[i + 1]; i += 2
         elif a[i] == '--views':
             views = [tuple(float(x) for x in v.split(',')) for v in a[i + 1].split(';')]; i += 2
         else:
             i += 1
     faces = data['faces']
+    if cut:
+        # e.g. "x>0" removes faces whose centroid has x > 0; "y>3.2" removes everything above 3.2 m
+        ax, val = cut[0], float(cut[2:])
+        k = 'xyz'.index(ax)
+        faces = [f for f in faces if sum(p[k] for p in f['p']) / len(f['p']) <= val]
     if focus:
         faces = [f for f in faces if any(focus[0] <= p[2] <= focus[1] for p in f['p'])]
     W, H = 700, 480
@@ -54,7 +63,10 @@ def main():
         for f in vis:
             n = f['n']
             sh = 0.35 + 0.65 * max(0.0, n[0] * light[0] + n[1] * light[1] + n[2] * light[2])
-            if bytype:
+            if paint and 'c' in f:
+                h = f['c']
+                col = tuple(int(h[i:i + 2], 16) * sh for i in (0, 2, 4))
+            elif bytype:
                 d_ = f['d']
                 if d_ == '01_block':
                     col = (120 * sh, 140 * sh, 220 * sh)

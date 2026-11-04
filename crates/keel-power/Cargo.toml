@@ -1,0 +1,9 @@
+[package]
+name = "keel-power"
+description = "KEEL powertrain designer and calculators: resistance, propellers, modular engines, gearboxes, electric drive"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
