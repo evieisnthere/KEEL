@@ -38,6 +38,12 @@ struct KeelApp {
     status: String,
     scale_input: [i32; 3],
     frame_next: bool,
+    renderer: std::sync::Arc<std::sync::Mutex<viewport::Renderer>>,
+    meshes: geometry::MeshLibrary,
+    rom_override: Option<PathBuf>,
+    clean: bool,
+    zoom: f32,
+    look: Option<[f32; 3]>,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -73,8 +79,18 @@ impl KeelApp {
             status: "Ready".into(),
             scale_input: [1, 1, 1],
             frame_next: true,
+            renderer: Default::default(),
+            meshes: geometry::MeshLibrary::default(),
+            rom_override: args.rom.clone(),
+            clean: args.clean,
+            zoom: args.zoom,
+            look: args.look,
             settings,
         };
+        if let Some([y, p]) = args.view {
+            app.cam.yaw = y;
+            app.cam.pitch = p;
+        }
         app.load_catalogue();
         if let Some(p) = args.vehicle {
             app.open(p);
@@ -99,6 +115,8 @@ impl KeelApp {
                 self.catalogue = Catalogue::fallback();
             }
         }
+        let rom = self.rom_override.clone().or_else(|| self.settings.definitions_dir.as_deref().and_then(geometry::MeshLibrary::rom_from_definitions));
+        self.meshes = geometry::MeshLibrary::new(rom);
         self.faces_gen = u64::MAX;
     }
 
@@ -131,15 +149,30 @@ impl KeelApp {
 
     fn refresh(&mut self) {
         if self.faces_gen != self.model.generation {
-            self.faces = geometry::build_faces(&self.model, &self.catalogue);
+            self.faces = geometry::build_faces_with(&self.model, &self.catalogue, &mut self.meshes);
             self.diags = diagnostics::check(&self.model, &self.catalogue);
             self.faces_gen = self.model.generation;
             let n = self.model.components().len();
             self.selected.retain(|id| id.comp < n + 1_000_000 && self.model.component_element(*id).is_some());
             if self.frame_next {
                 self.cam.frame(&self.faces);
+                self.cam.dist /= self.zoom;
+                if let Some(l) = self.look {
+                    self.cam.target = l;
+                }
                 self.frame_next = false;
             }
+        }
+        let sel_key = {
+            use std::hash::{Hash, Hasher};
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            self.sel().hash(&mut h);
+            h.finish()
+        };
+        let key = (self.faces_gen, sel_key);
+        let mut r = self.renderer.lock().unwrap();
+        if r.uploaded_key != key {
+            r.set_data(viewport::vertex_data(&self.faces, &self.selected), key);
         }
     }
 
@@ -533,6 +566,7 @@ impl eframe::App for KeelApp {
         );
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
 
+        if !self.clean {
         egui::Panel::top("menu").show(ui, |ui| self.menu(ui));
         egui::Panel::bottom("status").show(ui, |ui| {
             ui.horizontal(|ui| {
@@ -547,6 +581,7 @@ impl eframe::App for KeelApp {
         });
         egui::Panel::left("catalogue").default_size(250.0).show(ui, |ui| self.left_panel(ui));
         egui::Panel::right("inspector").default_size(300.0).show(ui, |ui| self.right_panel(ui));
+        }
         egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| {
             let rect = ui.available_rect_before_wrap();
             // placement ghost under the cursor
@@ -572,7 +607,7 @@ impl eframe::App for KeelApp {
                     }
                 }
             }
-            let r = viewport::show(ui, &mut self.cam, &self.faces, &self.selected, ghost.as_deref());
+            let r = viewport::show(ui, &mut self.cam, &self.renderer, ghost.as_deref());
             if let Some((pos, mods)) = r.clicked {
                 match self.tool {
                     Tool::Select => {
@@ -614,16 +649,38 @@ impl eframe::App for KeelApp {
 struct Args {
     vehicle: Option<PathBuf>,
     defs: Option<PathBuf>,
+    rom: Option<PathBuf>,
+    view: Option<[f32; 2]>,
+    clean: bool,
+    zoom: f32,
+    look: Option<[f32; 3]>,
 }
 
 fn parse_args() -> Args {
-    let mut a = Args { vehicle: None, defs: None };
+    let mut a = Args { vehicle: None, defs: None, rom: None, view: None, clean: false, zoom: 1.0, look: None };
     let mut it = std::env::args().skip(1);
     while let Some(x) = it.next() {
         if x == "--defs" {
             a.defs = it.next().map(PathBuf::from);
+        } else if x == "--zoom" {
+            a.zoom = it.next().and_then(|v| v.parse().ok()).unwrap_or(1.0);
+        } else if x == "--look" {
+            a.look = it.next().and_then(|v| {
+                let p: Vec<f32> = v.split(',').filter_map(|x| x.trim().parse().ok()).collect();
+                (p.len() == 3).then(|| [p[0], p[1], p[2]])
+            });
+        } else if x == "--clean" {
+            a.clean = true;
+        } else if x == "--rom" {
+            a.rom = it.next().map(PathBuf::from);
+        } else if x == "--view" {
+            // yaw,pitch in degrees (camera direction from the target)
+            a.view = it.next().and_then(|v| {
+                let p: Vec<f32> = v.split(',').filter_map(|x| x.trim().parse().ok()).collect();
+                (p.len() == 2).then(|| [p[0].to_radians(), p[1].to_radians()])
+            });
         } else if x == "--help" || x == "-h" {
-            println!("keel [vehicle.xml] [--defs <rom/data/definitions>]");
+            println!("keel [vehicle.xml] [--defs <rom/data/definitions>] [--rom <rom folder with meshes/>] [--view yaw,pitch]");
             std::process::exit(0);
         } else {
             a.vehicle = Some(PathBuf::from(x));
@@ -638,6 +695,7 @@ fn parse_args() -> Args {
 fn main() -> eframe::Result<()> {
     let args = parse_args();
     let options = eframe::NativeOptions {
+        depth_buffer: 24,
         viewport: egui::ViewportBuilder::default().with_inner_size([1400.0, 860.0]).with_title("KEEL"),
         ..Default::default()
     };

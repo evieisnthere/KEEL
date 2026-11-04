@@ -15,6 +15,8 @@ pub struct CompInfo {
     pub voxel: [i32; 3],
     pub rotation: [i32; 9],
     pub sc: Option<String>,
+    /// paint and other small attributes of `<o>` (bc, bc2, bc3, ac, …)
+    pub attrs: std::collections::HashMap<String, String>,
 }
 
 pub struct Model {
@@ -140,6 +142,7 @@ impl Model {
                             voxel: v3(o.find("vp")),
                             rotation: rot_of(o),
                             sc: o.get("sc"),
+                            attrs: ["bc", "bc2", "bc3", "ac", "gc"].iter().filter_map(|k| o.get(k).map(|v| (k.to_string(), v))).collect(),
                         },
                     ));
                 }

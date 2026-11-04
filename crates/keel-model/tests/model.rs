@@ -1,6 +1,6 @@
 use keel_model::{diagnostics, geometry, Catalogue, CompId, Model};
 
-const SRC: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<vehicle data_version=\"3\" bodies_id=\"1\" custom=\"keep\">\n<bodies>\n<body unique_id=\"0\">\n<components>\n<c><o sc=\"6,FF0000,x,x,x,x,x\"><vp x=\"1\"/><mystery a=\"1\"/></o></c>\n<c><o><vp x=\"2\"/></o></c>\n</components>\n</body>\n</bodies>\n</vehicle>\n";
+const SRC: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<vehicle data_version=\"3\" bodies_id=\"1\" custom=\"keep\">\n<bodies>\n<body unique_id=\"0\">\n<components>\n<c><o sc=\"6,x,FF0000,x,x,x,x\"><vp x=\"1\"/><mystery a=\"1\"/></o></c>\n<c><o><vp x=\"2\"/></o></c>\n</components>\n</body>\n</bodies>\n</vehicle>\n";
 
 #[test]
 fn untouched_roundtrip_is_identical() {
@@ -55,7 +55,7 @@ fn faces_cull_internal_walls() {
     let faces = geometry::build_faces(&m, &cat);
     // two adjacent unit blocks: 12 faces minus the 2 shared ones (a full face may be emitted as 1 polygon)
     assert_eq!(faces.len(), 10, "faces: {}", faces.len());
-    assert_eq!(faces.iter().find(|f| f.comp.comp == 0).unwrap().colour, [255, 0, 0]);
+    assert!(faces.iter().any(|f| f.comp.comp == 0 && f.colour == [255, 0, 0, 255]));
 }
 
 #[test]
@@ -92,4 +92,18 @@ fn user_scale_matches_workshop_form() {
     m.set_scale(&id, [0, 0, 0]);
     m.set_scale(&id, [2, 2, 2]);
     assert_eq!(Model::scale_of(&m.components()[1].1.rotation), [2, 2, 2]);
+}
+
+#[test]
+fn block_solids_match_game_hulls() {
+    use keel_model::geometry::{block_points, convex_hull_faces};
+    let count = |bt| convex_hull_faces(&block_points(bt).unwrap()).len();
+    assert_eq!(count(0), 6); // cube
+    assert_eq!(count(1), 5); // wedge
+    assert_eq!(count(2), 4); // corner pyramid
+    assert_eq!(count(3), 7); // inverse pyramid: cube minus a corner
+    assert_eq!(count(7), 5); // wedge 1x4
+    // wedge: top edge at +z, slope falling to -z (0x14031ab90 hull points)
+    let w = block_points(1).unwrap();
+    assert!(w.contains(&[0.125, 0.125, 0.125]) && !w.contains(&[0.125, 0.125, -0.125]));
 }
