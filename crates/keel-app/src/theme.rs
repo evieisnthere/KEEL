@@ -62,9 +62,53 @@ pub fn apply(ctx: &egui::Context) {
     });
 }
 
-/// Frame for side panels: panel fill, generous margins (document-editor feel).
+/// Frame for side panels: the app background around a floating card (see [`card`]).
 pub fn side_frame() -> egui::Frame {
-    egui::Frame::NONE.fill(PANEL).inner_margin(Margin::symmetric(12, 10)).stroke(Stroke::new(1.0, LINE))
+    egui::Frame::NONE.fill(BG).inner_margin(Margin { left: 10, right: 10, top: 0, bottom: 10 })
+}
+
+/// A rounded card filling the panel, document-editor style.
+pub fn card<R>(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    egui::Frame::NONE
+        .fill(PANEL)
+        .corner_radius(CornerRadius::same(16))
+        .stroke(Stroke::new(1.0, LINE.gamma_multiply(0.6)))
+        .inner_margin(Margin::symmetric(14, 12))
+        .show(ui, |ui| {
+            ui.set_min_size(ui.available_size());
+            add(ui)
+        })
+        .inner
+}
+
+/// The central area: background margin so the canvas floats like a page.
+pub fn centre_frame() -> egui::Frame {
+    egui::Frame::NONE.fill(BG).inner_margin(Margin { left: 0, right: 0, top: 0, bottom: 10 })
+}
+
+/// Mask the corners of a canvas (GL viewport or painter canvas) so it reads as a rounded card.
+pub fn round_corners(p: &egui::Painter, r: egui::Rect) {
+    let rad = 16.0;
+    let n = 8;
+    for (c, a0) in [(r.left_top() + egui::vec2(rad, rad), 180.0f32), (r.right_top() + egui::vec2(-rad, rad), 270.0), (r.right_bottom() + egui::vec2(-rad, -rad), 0.0), (r.left_bottom() + egui::vec2(rad, -rad), 90.0)] {
+        let corner = egui::pos2(c.x + rad * (a0 + 45.0).to_radians().cos() * std::f32::consts::SQRT_2, c.y + rad * (a0 + 45.0).to_radians().sin() * std::f32::consts::SQRT_2);
+        for i in 0..n {
+            let t0 = (a0 + 90.0 * i as f32 / n as f32).to_radians();
+            let t1 = (a0 + 90.0 * (i + 1) as f32 / n as f32).to_radians();
+            let pts = vec![corner, egui::pos2(c.x + rad * t0.cos(), c.y + rad * t0.sin()), egui::pos2(c.x + rad * t1.cos(), c.y + rad * t1.sin())];
+            p.add(egui::Shape::convex_polygon(pts, BG, Stroke::NONE));
+        }
+    }
+}
+
+/// The KEEL mark: a rounded tile with a hull profile and keel line.
+pub fn logo(p: &egui::Painter, r: egui::Rect) {
+    p.rect_filled(r.shrink(2.0), 10.0, Color32::from_rgb(0x2b, 0x2f, 0x6e));
+    let s = r.width() / 40.0;
+    let at = |x: f32, y: f32| r.min + egui::vec2(x * s, y * s);
+    p.add(egui::Shape::convex_polygon(vec![at(8.0, 17.0), at(33.0, 17.0), at(28.0, 26.0), at(12.0, 26.0)], CYAN, Stroke::NONE));
+    p.line_segment([at(20.0, 26.0), at(20.0, 32.0)], Stroke::new(2.4 * s, CYAN));
+    p.line_segment([at(14.0, 12.5), at(26.0, 12.5)], Stroke::new(2.0 * s, TEXT));
 }
 
 /// Frame for the title/menu/toolbar rows.
@@ -77,9 +121,9 @@ pub fn pill() -> egui::Frame {
     egui::Frame::NONE.fill(SURFACE).corner_radius(CornerRadius::same(18)).inner_margin(Margin::symmetric(10, 4))
 }
 
-/// Section heading in side panels.
+/// Section heading in side panels (sentence case, document style).
 pub fn section(ui: &mut egui::Ui, text: &str) {
-    ui.add_space(4.0);
-    ui.label(egui::RichText::new(text.to_uppercase()).small().color(TEXT_DIM).strong());
+    ui.add_space(6.0);
+    ui.label(egui::RichText::new(text).size(13.5).color(TEXT).strong());
     ui.add_space(2.0);
 }

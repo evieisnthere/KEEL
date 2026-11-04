@@ -271,7 +271,7 @@ impl McEditor {
                 let major = (x.round() - x).abs() < 1e-3;
                 if major || self.zoom > 0.6 {
                     let sx = rect.center().x + (x + self.pan.x) * u;
-                    painter.line_segment([Pos2::new(sx, rect.top()), Pos2::new(sx, rect.bottom())], Stroke::new(if major { 1.0 } else { 0.5 }, if major { theme::GRID } else { theme::GRID.gamma_multiply(0.45) }));
+                    painter.line_segment([Pos2::new(sx, rect.top()), Pos2::new(sx, rect.bottom())], Stroke::new(if major { 1.0 } else { 0.5 }, if major { theme::GRID.gamma_multiply(0.75) } else { theme::GRID.gamma_multiply(0.35) }));
                 }
                 x += step;
             }
@@ -280,7 +280,7 @@ impl McEditor {
                 let major = (y.round() - y).abs() < 1e-3;
                 if major || self.zoom > 0.6 {
                     let sy = rect.center().y + (y + self.pan.y) * u;
-                    painter.line_segment([Pos2::new(rect.left(), sy), Pos2::new(rect.right(), sy)], Stroke::new(if major { 1.0 } else { 0.5 }, if major { theme::GRID } else { theme::GRID.gamma_multiply(0.45) }));
+                    painter.line_segment([Pos2::new(rect.left(), sy), Pos2::new(rect.right(), sy)], Stroke::new(if major { 1.0 } else { 0.5 }, if major { theme::GRID.gamma_multiply(0.75) } else { theme::GRID.gamma_multiply(0.35) }));
                 }
                 y += step;
             }

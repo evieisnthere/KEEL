@@ -560,20 +560,30 @@ impl KeelApp {
     }
 
     /// Title row (document-editor style): product mark, document name, save state.
-    fn title_row(&mut self, ui: &mut egui::Ui) {
+    /// Document-style header: logo spanning two rows, vessel name and save state above the menu bar.
+    fn header(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.label(RichText::new("KEEL").strong().size(20.0).color(theme::CYAN));
-            ui.add_space(8.0);
-            let name = self.path.as_ref().map(|p| {
-                let dir = p.parent().and_then(|d| d.file_name()).map(|d| d.to_string_lossy().to_string()).unwrap_or_default();
-                if p.file_name().is_some_and(|f| f == "vehicle.xml") && !dir.is_empty() { dir } else { p.file_name().unwrap_or_default().to_string_lossy().to_string() }
-            });
-            ui.label(RichText::new(name.unwrap_or_else(|| "Untitled vessel".into())).size(17.0));
-            ui.add_space(10.0);
-            let (txt, col) = if self.model.dirty { ("Unsaved changes", theme::ORANGE) } else if self.path.is_some() { ("All changes saved", theme::TEXT_DIM) } else { ("Not saved yet", theme::TEXT_DIM) };
-            ui.label(RichText::new(txt).small().color(col));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.label(RichText::new("Stormworks Engineering Suite").small().color(theme::TEXT_DIM));
+            let (r, _) = ui.allocate_exact_size(egui::vec2(40.0, 40.0), egui::Sense::hover());
+            theme::logo(ui.painter(), r);
+            ui.add_space(6.0);
+            ui.vertical(|ui| {
+                ui.spacing_mut().item_spacing.y = 0.0;
+                ui.horizontal(|ui| {
+                    let name = self.path.as_ref().map(|p| {
+                        let dir = p.parent().and_then(|d| d.file_name()).map(|d| d.to_string_lossy().to_string()).unwrap_or_default();
+                        if p.file_name().is_some_and(|f| f == "vehicle.xml") && !dir.is_empty() { dir } else { p.file_name().unwrap_or_default().to_string_lossy().to_string() }
+                    });
+                    ui.label(RichText::new(name.unwrap_or_else(|| "Untitled vessel".into())).size(18.0));
+                    ui.add_space(10.0);
+                    let (txt, col) = if self.model.dirty { ("Unsaved changes", theme::ORANGE) } else if self.path.is_some() { ("All changes saved", theme::TEXT_DIM) } else { ("Not saved yet", theme::TEXT_DIM) };
+                    let (d, _) = ui.allocate_exact_size(egui::vec2(8.0, 8.0), egui::Sense::hover());
+                    ui.painter().circle_filled(d.center(), 3.5, col);
+                    ui.label(RichText::new(txt).small().color(col));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(RichText::new(format!("KEEL {}  ·  Stormworks Engineering Suite", env!("CARGO_PKG_VERSION"))).small().color(theme::TEXT_DIM));
+                    });
+                });
+                self.menu(ui);
             });
         });
     }
@@ -790,11 +800,15 @@ impl KeelApp {
         egui::ScrollArea::vertical().id_salt("diag").show(ui, |ui| {
             for d in self.diags.clone() {
                 let col = match d.severity {
-                    Severity::Error => Color32::from_rgb(240, 90, 90),
-                    Severity::Warning => Color32::from_rgb(240, 190, 80),
-                    Severity::Info => Color32::from_rgb(140, 180, 230),
+                    Severity::Error => theme::RED,
+                    Severity::Warning => theme::ORANGE,
+                    Severity::Info => Color32::from_rgb(0x7a, 0x9c, 0xe8),
                 };
-                let r = ui.add(egui::Label::new(RichText::new(format!("{} {}", match d.severity { Severity::Error => "[error]", Severity::Warning => "[warn]", Severity::Info => "[info]" }, d.message)).color(col)).sense(egui::Sense::click()));
+                let fr = egui::Frame::NONE.inner_margin(egui::Margin { left: 16, right: 0, top: 1, bottom: 1 }).show(ui, |ui| {
+                    ui.add(egui::Label::new(RichText::new(&d.message).color(if d.severity == Severity::Info { theme::TEXT_DIM } else { col })).wrap().sense(egui::Sense::click()))
+                });
+                ui.painter().circle_filled(fr.response.rect.left_top() + egui::vec2(5.0, 10.0), 4.0, col);
+                let r = fr.inner;
                 if !d.components.is_empty() && r.on_hover_text("click to select").clicked() {
                     self.selected = d.components.iter().copied().collect();
                 }
@@ -958,10 +972,9 @@ impl eframe::App for KeelApp {
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
 
         if !self.clean {
-            egui::Panel::top("title").frame(theme::bar_frame()).show(ui, |ui| self.title_row(ui));
-            egui::Panel::top("menu").frame(theme::bar_frame()).show(ui, |ui| self.menu(ui));
-            egui::Panel::top("toolbar").frame(theme::bar_frame().inner_margin(egui::Margin::symmetric(12, 8))).show(ui, |ui| self.toolbar(ui));
-            egui::Panel::bottom("status").frame(theme::bar_frame()).show(ui, |ui| {
+            egui::Panel::top("header").show_separator_line(false).frame(theme::bar_frame().inner_margin(egui::Margin { left: 14, right: 14, top: 8, bottom: 2 })).show(ui, |ui| self.header(ui));
+            egui::Panel::top("toolbar").show_separator_line(false).frame(theme::bar_frame().inner_margin(egui::Margin { left: 12, right: 12, top: 6, bottom: 8 })).show(ui, |ui| self.toolbar(ui));
+            egui::Panel::bottom("status").show_separator_line(false).frame(theme::bar_frame()).show(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(&self.status).small());
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -972,7 +985,7 @@ impl eframe::App for KeelApp {
             });
             let mut bake = None;
             let mut generated = None;
-            egui::Panel::left("left").frame(theme::side_frame()).default_size(300.0).show(ui, |ui| match self.mode {
+            egui::Panel::left("left").frame(theme::side_frame()).show_separator_line(false).default_size(300.0).show(ui, |ui| theme::card(ui, |ui| match self.mode {
                 Mode::Build => self.left_panel(ui),
                 Mode::Hull => {
                     self.design.refresh();
@@ -997,14 +1010,14 @@ impl eframe::App for KeelApp {
                         generated = Some(g);
                     }
                 }
-            });
+            }));
             if let Some(b) = bake {
                 self.apply_bake(b);
             }
             if let Some(g) = generated {
                 self.apply_interior(g);
             }
-            egui::Panel::right("right").frame(theme::side_frame()).default_size(310.0).show(ui, |ui| {
+            egui::Panel::right("right").frame(theme::side_frame()).show_separator_line(false).default_size(310.0).show(ui, |ui| theme::card(ui, |ui| {
                 if self.mode == Mode::Hull {
                     self.design.hydro_ui(ui);
                     ui.separator();
@@ -1018,26 +1031,30 @@ impl eframe::App for KeelApp {
                     return;
                 }
                 self.right_panel(ui)
-            });
+            }));
         }
         if self.mode == Mode::Decks {
             self.interior.refresh(self.design.hull.as_ref(), &self.design.doc.hull, self.design.doc.origin);
             self.interior.plan_window(&ctx);
             if self.interior.docked {
-                egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| self.interior.plan_ui(ui));
+                egui::CentralPanel::default().frame(theme::centre_frame()).show(ui, |ui| self.interior.plan_ui(ui));
                 return;
             }
         }
         if self.mode == Mode::Logic {
             self.mc.sync(&self.model);
-            egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| self.mc.canvas(ui, &mut self.model));
+            egui::CentralPanel::default().frame(theme::centre_frame()).show(ui, |ui| {
+                let r = ui.available_rect_before_wrap();
+                self.mc.canvas(ui, &mut self.model);
+                theme::round_corners(ui.painter(), r);
+            });
             if !self.mc.status.is_empty() {
                 self.status = std::mem::take(&mut self.mc.status);
             }
             self.dialogs(&ctx);
             return;
         }
-        egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| {
+        egui::CentralPanel::default().frame(if self.clean { egui::Frame::NONE } else { theme::centre_frame() }).show(ui, |ui| {
             let rect = ui.available_rect_before_wrap();
             let view = self.cam.view(rect);
             let hover = ui.ctx().pointer_hover_pos().filter(|p| rect.contains(*p));
@@ -1063,6 +1080,9 @@ impl eframe::App for KeelApp {
                 }
             }
             let r = viewport::show(ui, &mut self.cam, &self.renderer, ghost.as_deref());
+            if !self.clean {
+                theme::round_corners(ui.painter(), rect);
+            }
             let click = r.clicked;
             if self.tool == Tool::Wire {
                 if let Some(l) = self.wiring.overlay(ui, &view, &self.model, &self.catalogue, &self.selected, click.map(|c| c.0)) {
