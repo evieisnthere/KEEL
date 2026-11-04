@@ -3,6 +3,7 @@ pub mod hull;
 pub mod nurbs;
 pub mod voxel;
 pub mod blockhull;
+pub mod facets;
 
 /// A hull as a voxelisable solid (sections cached per sample plane).
 pub struct HullSolid<'a> {
@@ -39,7 +40,10 @@ impl voxel::Solid for HullSolid<'_> {
         }
         // near the deck edge (sheer) the surface is the horizontal deck plane
         if q[1] > p.sheer(s) - 0.125 {
-            return Some([0.0, 1.0, 0.0]);
+            // deck: rises with the sheer along the length
+            let ds_dz = (2.0 * p.sheer_bow * s - 2.0 * p.sheer_stern * (1.0 - s)) / p.length;
+            let l = (1.0 + ds_dz * ds_dz).sqrt();
+            return Some([0.0, 1.0 / l, -ds_dz / l]);
         }
         let b = |y: f64, z: f64| -> Option<f64> {
             let sec = self.hull.section_at(z, 48)?;

@@ -38,6 +38,10 @@ pub fn rotations() -> &'static [[i32; 9]] {
     })
 }
 
+pub fn sample_offsets_pub() -> Vec<[f64; 3]> {
+    sample_offsets()
+}
+
 fn sample_offsets() -> Vec<[f64; 3]> {
     let mut v = Vec::with_capacity(N * N * N);
     for i in 0..N {
