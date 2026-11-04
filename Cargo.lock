@@ -1039,6 +1039,7 @@ dependencies = [
  "keel-geom",
  "keel-io",
  "keel-layout",
+ "keel-mc",
  "keel-model",
  "keel-power",
  "rfd",
@@ -1069,6 +1070,13 @@ dependencies = [
  "keel-model",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "keel-mc"
+version = "0.1.0"
+dependencies = [
+ "keel-io",
 ]
 
 [[package]]

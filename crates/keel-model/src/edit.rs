@@ -502,6 +502,25 @@ impl Model {
         self.dirty = true;
     }
 
+    /// The `microprocessor_definition` of a microcontroller component (a copy), if it has one.
+    pub fn mc_definition(&self, id: CompId) -> Option<Element> {
+        self.component_element(id)?.find("o")?.find("microprocessor_definition").cloned()
+    }
+
+    /// Replace (or add) a microcontroller component's definition (one undo step).
+    pub fn set_mc_definition(&mut self, id: CompId, def: Element) -> bool {
+        if self.component_o_mut(id).is_none() {
+            return false;
+        }
+        self.checkpoint();
+        let o = self.component_o_mut(id).unwrap();
+        match o.find_mut("microprocessor_definition") {
+            Some(e) => *e = def,
+            None => o.insert(0, def),
+        }
+        true
+    }
+
     fn component_o_mut(&mut self, id: CompId) -> Option<&mut Element> {
         let cs = self.components_el_mut(id.body)?;
         cs.elements_mut().filter(|e| e.tag == "c").nth(id.comp)?.find_mut("o")

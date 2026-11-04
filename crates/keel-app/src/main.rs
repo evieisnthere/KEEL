@@ -4,6 +4,7 @@
 mod design;
 mod icons;
 mod interior;
+mod mc;
 mod palette;
 mod tools;
 mod wiring;
@@ -26,6 +27,7 @@ enum Mode {
     Hull,
     Decks,
     Power,
+    Logic,
 }
 
 use tools::Tool;
@@ -62,6 +64,7 @@ struct KeelApp {
     design: design::Design,
     interior: interior::Interior,
     power: power::Power,
+    mc: mc::McEditor,
     frame_next_hull: bool,
     bake_on_start: bool,
 }
@@ -107,10 +110,11 @@ impl KeelApp {
             clean: args.clean,
             zoom: args.zoom,
             look: args.look,
-            mode: match args.mode.as_deref() { Some("hull") => Mode::Hull, Some("decks") => Mode::Decks, Some("power") => Mode::Power, _ => Mode::Build },
+            mode: match args.mode.as_deref() { Some("hull") => Mode::Hull, Some("decks") => Mode::Decks, Some("power") => Mode::Power, Some("logic") => Mode::Logic, _ => Mode::Build },
             design: design::Design::default(),
             interior: interior::Interior::with_docked(args.plan_docked),
             power: power::Power::default(),
+            mc: mc::McEditor::default(),
             frame_next_hull: true,
             bake_on_start: args.bake,
             settings,
@@ -261,6 +265,26 @@ impl KeelApp {
         if ctx.egui_wants_keyboard_input() {
             return;
         }
+        if self.mode == Mode::Logic {
+            // the canvas handles its own keys; only history and save are global here
+            let (undo, redo, save) = ctx.input(|i| {
+                let c = i.modifiers.command;
+                (c && i.key_pressed(egui::Key::Z) && !i.modifiers.shift, c && (i.key_pressed(egui::Key::Y) || (i.key_pressed(egui::Key::Z) && i.modifiers.shift)), c && i.key_pressed(egui::Key::S))
+            });
+            if undo && self.model.undo() {
+                self.status = "Undo".into();
+            }
+            if redo && self.model.redo() {
+                self.status = "Redo".into();
+            }
+            if save {
+                match self.path.clone() {
+                    Some(p) => self.save(p),
+                    None => self.dialog = Some(Dialog::SaveAs),
+                }
+            }
+            return;
+        }
         let ids = self.sel();
         let (copy, paste, mirror) = ctx.input(|i| (i.modifiers.command && i.key_pressed(egui::Key::C), i.modifiers.command && i.key_pressed(egui::Key::V), !i.modifiers.command && i.key_pressed(egui::Key::M)));
         if copy && !ids.is_empty() {
@@ -366,6 +390,21 @@ impl KeelApp {
         }
         if scale && !ids.is_empty() {
             self.open_scale_dialog();
+        }
+    }
+
+    /// Add a 2×2 microcontroller above the vehicle and open it in the editor.
+    fn create_mc(&mut self) {
+        let top = self.model.components().iter().map(|(_, c)| c.voxel[1]).max().map(|y| y + 2).unwrap_or(0);
+        if self.model.body_count() == 0 {
+            self.status = "The vehicle has no body to add a microcontroller to".into();
+            return;
+        }
+        if let Some(id) = self.model.add(0, "microprocessor", [0, top, 0], keel_io::vehicle::IDENTITY) {
+            let g = keel_mc::graph::Graph::new_empty("New microcontroller", 2, 2);
+            self.model.set_mc_definition(id, g.to_element());
+            self.mc.open(id, &self.model);
+            self.status = format!("Added a microcontroller at {:?}", [0, top, 0]);
         }
     }
 
@@ -502,7 +541,7 @@ impl KeelApp {
         }
         match d.pick_file() {
             Some(p) => self.open(p),
-            None => self.status = "Open cancelled (use File → Open by path if no dialog appeared)".into(),
+            None => self.status = "Open cancelled (use File > Open by path if no dialog appeared)".into(),
         }
     }
 
@@ -550,33 +589,50 @@ impl KeelApp {
                     if ui.add_enabled_ui(self.model.can_redo(), |ui| icons::button(ui, false, icons::Icon::Redo, "", "Redo (Ctrl+Y)")).inner.clicked() {
                         self.model.redo();
                     }
-                    ui.separator();
-                    for (t, icon, name, tip) in Tool::ALL {
-                        if icons::button(ui, self.tool == t, icon, name, tip).clicked() {
-                            self.tool = t;
-                            self.tools.stamping = false;
-                            self.tools.fill_start = None;
+                    if self.mode != Mode::Logic {
+                        if icons::button(ui, false, icons::Icon::Frame, "", "Frame the vehicle (F)").clicked() {
+                            self.cam.frame(&self.faces);
                         }
-                    }
-                    ui.separator();
-                    if icons::button(ui, self.tools.mirror, icons::Icon::Mirror, "Mirror", "Mirror placing, filling and painting across the centre line (M)").clicked() {
-                        self.tools.mirror = !self.tools.mirror;
-                    }
-                    ui.color_edit_button_srgb(&mut self.tools.colour).on_hover_text("Paint colour (used by Place, Fill and Paint; Alt+click with Paint picks a colour)");
-                    ui.separator();
-                    if icons::button(ui, false, icons::Icon::Frame, "", "Frame the vehicle (F)").clicked() {
-                        self.cam.frame(&self.faces);
                     }
                 });
             });
-            ui.add_space(12.0);
-            theme::pill().show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    for (m, name, tip) in [(Mode::Build, "Build", "Block editor and catalogue"), (Mode::Hull, "Hull", "Parametric NURBS hull, hydrostatics, bake to blocks"), (Mode::Decks, "Decks", "Deck and floor planning, generators"), (Mode::Power, "Power", "Powertrain designer and calculators")] {
-                        if theme::tool_button(ui, self.mode == m, name, tip) {
-                            self.mode = m;
+            if self.mode == Mode::Build {
+                ui.add_space(8.0);
+                theme::pill().show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        for (t, icon, name, tip) in Tool::ALL {
+                            if icons::button(ui, self.tool == t, icon, name, tip).clicked() {
+                                self.tool = t;
+                                self.tools.stamping = false;
+                                self.tools.fill_start = None;
+                            }
                         }
-                    }
+                        ui.separator();
+                        if icons::button(ui, self.tools.mirror, icons::Icon::Mirror, "Mirror", "Mirror placing, filling and painting across the centre line (M)").clicked() {
+                            self.tools.mirror = !self.tools.mirror;
+                        }
+                        ui.color_edit_button_srgb(&mut self.tools.colour).on_hover_text("Paint colour (used by Place, Fill and Paint; Alt+click with Paint picks a colour)");
+                    });
+                });
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                theme::pill().show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        for (m, icon, name, tip) in [
+                            (Mode::Build, icons::Icon::Place, "Build", "Block editor, part palette and wiring"),
+                            (Mode::Hull, icons::Icon::Hull, "Hull", "Parametric hull, hydrostatics, bake to blocks"),
+                            (Mode::Decks, icons::Icon::Decks, "Decks", "Decks, floor plans, rooms, furniture and lighting"),
+                            (Mode::Power, icons::Icon::Power, "Power", "Powertrain designer and calculators"),
+                            (Mode::Logic, icons::Icon::Chip, "Logic", "Microcontroller editor and simulator"),
+                        ]
+                        .into_iter()
+                        .rev()
+                        {
+                            if icons::button(ui, self.mode == m, icon, name, tip).clicked() {
+                                self.mode = m;
+                            }
+                        }
+                    });
                 });
             });
         });
@@ -662,6 +718,10 @@ impl KeelApp {
                     ui.label(format!("{:?}", Model::scale_of(&c.rotation)));
                     ui.end_row();
                 });
+                if c.def == "microprocessor" && ui.button("Edit microcontroller").clicked() {
+                    self.mode = Mode::Logic;
+                    self.mc.open(*id, &self.model);
+                }
                 if let Some(bc) = c.attrs.get("bc") {
                     ui.horizontal(|ui| {
                         ui.label("paint");
@@ -680,7 +740,7 @@ impl KeelApp {
                             let (r, _) = ui.allocate_exact_size(egui::vec2(10.0, 10.0), egui::Sense::hover());
                             ui.painter().circle_filled(r.center(), 4.0, wiring::kind_colour(l.kind));
                             ui.label(RichText::new(desc).small());
-                            if ui.small_button("✕").on_hover_text("Remove this wire").clicked() {
+                            if icons::button(ui, false, icons::Icon::Trash, "", "Remove this wire").clicked() {
                                 gone = Some(l.clone());
                             }
                         });
@@ -924,6 +984,12 @@ impl eframe::App for KeelApp {
                     self.power.refresh(self.design.hull.as_ref(), &self.design.doc.hull, mass);
                     self.power.panel_ui(ui);
                 }
+                Mode::Logic => {
+                    self.mc.sync(&self.model);
+                    if self.mc.panel_ui(ui, &self.model) {
+                        self.create_mc();
+                    }
+                }
                 Mode::Decks => {
                     self.design.refresh();
                     self.interior.refresh(self.design.hull.as_ref(), &self.design.doc.hull, self.design.doc.origin);
@@ -947,6 +1013,10 @@ impl eframe::App for KeelApp {
                     self.power.results_ui(ui);
                     ui.separator();
                 }
+                if self.mode == Mode::Logic {
+                    self.mc.inspector_ui(ui, &mut self.model);
+                    return;
+                }
                 self.right_panel(ui)
             });
         }
@@ -957,6 +1027,15 @@ impl eframe::App for KeelApp {
                 egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| self.interior.plan_ui(ui));
                 return;
             }
+        }
+        if self.mode == Mode::Logic {
+            self.mc.sync(&self.model);
+            egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| self.mc.canvas(ui, &mut self.model));
+            if !self.mc.status.is_empty() {
+                self.status = std::mem::take(&mut self.mc.status);
+            }
+            self.dialogs(&ctx);
+            return;
         }
         egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| {
             let rect = ui.available_rect_before_wrap();

@@ -99,7 +99,20 @@ pub fn check(model: &Model, cat: &Catalogue) -> Vec<Diagnostic> {
 pub fn wire_problems(model: &Model, cat: &Catalogue) -> Vec<(usize, [i32; 3], String)> {
     use crate::edit::port_voxel;
     let mut ports: HashMap<([i32; 3], i32), Vec<i32>> = HashMap::new();
-    for (_, c) in model.components() {
+    for (id, c) in model.components() {
+        // microcontroller ports: one per IO node of its definition, at the node's footprint cell (x, z)
+        if c.def == "microprocessor" {
+            if let Some(nodes) = model.mc_definition(id).as_ref().and_then(|d| d.find("nodes").cloned()) {
+                for n in nodes.elements().filter_map(|n| n.find("node")) {
+                    let num = |e: Option<&keel_io::xml::Element>, k: &str| e.and_then(|e| e.get(k)).and_then(|v| v.parse::<i32>().ok()).unwrap_or(0);
+                    let p = n.find("position");
+                    let kind = num(Some(n), "type");
+                    let mode = if num(Some(n), "mode") == 1 { 1 } else { 0 };
+                    ports.entry((port_voxel(c.voxel, &c.rotation, [num(p, "x"), 0, num(p, "z")]), kind)).or_default().push(mode);
+                }
+            }
+            continue;
+        }
         let Some(d) = cat.get(&c.def) else { continue };
         for n in &d.logic_nodes {
             ports.entry((port_voxel(c.voxel, &c.rotation, n.position), n.kind)).or_default().push(n.mode);

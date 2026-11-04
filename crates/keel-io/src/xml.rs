@@ -105,6 +105,22 @@ impl Element {
         }
         self.children.push(Node::Element(child));
     }
+    /// Insert a child element at child index `idx` (clamped).
+    pub fn insert(&mut self, idx: usize, child: Element) {
+        if self.self_closing {
+            self.self_closing = false;
+            self.dirty = true;
+        }
+        let i = idx.min(self.children.len());
+        self.children.insert(i, Node::Element(child));
+    }
+    /// Keep only the child elements for which `keep` is true (raw text is kept).
+    pub fn retain_elements(&mut self, mut keep: impl FnMut(&Element) -> bool) {
+        self.children.retain(|c| match c {
+            Node::Element(e) => keep(e),
+            Node::Raw(_) => true,
+        });
+    }
     /// Depth-first visit of this element and all descendants.
     pub fn walk<'a>(&'a self, f: &mut dyn FnMut(&'a Element)) {
         f(self);

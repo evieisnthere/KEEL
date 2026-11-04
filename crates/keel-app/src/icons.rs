@@ -17,6 +17,9 @@ pub enum Icon {
     Star,
     Chip,
     Trash,
+    Hull,
+    Decks,
+    Power,
 }
 
 /// Draw `icon` into `rect` (square) with colour `c`.
@@ -106,6 +109,22 @@ pub fn paint(p: &egui::Painter, rect: Rect, icon: Icon, c: Color32) {
                 line(&[(1.5, v), (4.0, v)]);
                 line(&[(12.0, v), (14.5, v)]);
             }
+        }
+        Icon::Hull => {
+            // side profile: sheer, raked bow, flat transom
+            closed(&[(1.5, 6.5), (14.5, 6.5), (12.0, 12.5), (3.0, 12.5), (1.5, 9.5)]);
+            line(&[(6.0, 6.5), (6.0, 3.5), (10.0, 3.5), (10.0, 6.5)]);
+        }
+        Icon::Decks => {
+            closed(&[(2.0, 2.5), (14.0, 2.5), (14.0, 13.5), (2.0, 13.5)]);
+            line(&[(2.0, 6.2), (14.0, 6.2)]);
+            line(&[(2.0, 9.8), (14.0, 9.8)]);
+            line(&[(8.0, 2.5), (8.0, 6.2)]);
+            line(&[(6.0, 9.8), (6.0, 13.5)]);
+        }
+        Icon::Power => {
+            p.add(egui::Shape::convex_polygon(vec![at(9.5, 1.5), at(3.5, 9.0), at(7.5, 9.0)], c, Stroke::NONE));
+            p.add(egui::Shape::convex_polygon(vec![at(8.5, 7.0), at(12.5, 7.0), at(6.5, 14.5)], c, Stroke::NONE));
         }
         Icon::Trash => {
             line(&[(2.5, 4.0), (13.5, 4.0)]);

@@ -64,6 +64,15 @@ impl Wiring {
         self.cache_gen = model.generation;
         self.ports.clear();
         for (id, c) in model.components() {
+            // a microcontroller's ports come from its own definition: one per IO node, at its footprint cell
+            if c.def == "microprocessor" {
+                if let Some(d) = model.mc_definition(id) {
+                    for n in keel_mc::graph::Graph::parse(&d).nodes {
+                        self.ports.push(Port { comp: id, def: c.def.clone(), label: n.label.clone(), kind: n.sig.link_kind(), mode: if n.input { 1 } else { 0 }, voxel: port_voxel(c.voxel, &c.rotation, [n.pos[0], 0, n.pos[1]]) });
+                    }
+                }
+                continue;
+            }
             let Some(d) = cat.get(&c.def) else { continue };
             for n in d.logic_nodes.iter().filter(|n| !matches!(n.kind, 2 | 3)) {
                 self.ports.push(Port { comp: id, def: c.def.clone(), label: n.label.clone(), kind: n.kind, mode: n.mode, voxel: port_voxel(c.voxel, &c.rotation, n.position) });
@@ -82,7 +91,7 @@ impl Wiring {
                 let p = mine.iter().find(|p| p.kind == l.kind && (p.voxel == l.a || p.voxel == l.b))?;
                 let other = if p.voxel == l.a { l.b } else { l.a };
                 let o = self.ports.iter().find(|q| q.kind == l.kind && q.voxel == other && q.comp != comp);
-                let desc = format!("{} → {}", p.label, o.map(|o| format!("{} ({})", o.label, o.def)).unwrap_or_else(|| format!("{other:?} (nothing there)")));
+                let desc = format!("{} to {}", p.label, o.map(|o| format!("{} ({})", o.label, o.def)).unwrap_or_else(|| format!("{other:?} (nothing there)")));
                 Some((l, desc))
             })
             .collect()
@@ -161,7 +170,7 @@ impl Wiring {
                         self.status = "Already wired".into();
                         return None;
                     }
-                    self.status = format!("Wired {} → {}", q.label, p.label);
+                    self.status = format!("Wired {} to {}", q.label, p.label);
                     return Some(l);
                 }
                 Some(_) => {

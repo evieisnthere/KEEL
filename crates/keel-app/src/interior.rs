@@ -263,7 +263,7 @@ impl Interior {
                     ui.label(format!("Deck {}", i + 1));
                     fchanged |= ui.add(egui::DragValue::new(f).range(base - 4..=deck_y - 2).prefix("row ")).changed();
                     ui.label(RichText::new(format!("floor {:.2} m", (*f + 1 - base) as f64 * 0.25)).small().color(theme::TEXT_DIM));
-                    if ui.small_button("✕").clicked() {
+                    if crate::icons::button(ui, false, crate::icons::Icon::Trash, "", "Remove").clicked() {
                         remove = Some(i);
                     }
                 });

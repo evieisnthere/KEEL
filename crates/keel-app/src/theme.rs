@@ -83,10 +83,3 @@ pub fn section(ui: &mut egui::Ui, text: &str) {
     ui.label(egui::RichText::new(text.to_uppercase()).small().color(TEXT_DIM).strong());
     ui.add_space(2.0);
 }
-
-/// Toolbar toggle button styled as a pill segment; returns true when clicked.
-pub fn tool_button(ui: &mut egui::Ui, active: bool, text: &str, tip: &str) -> bool {
-    let rt = egui::RichText::new(text).color(if active { BG } else { TEXT });
-    let b = egui::Button::new(rt).fill(if active { CYAN } else { Color32::TRANSPARENT }).corner_radius(CornerRadius::same(14));
-    ui.add(b).on_hover_text(tip).clicked()
-}
