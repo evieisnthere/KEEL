@@ -1,7 +1,9 @@
 //! KEEL desktop application (Phase 1: native vehicle foundation).
 //!
 //! Usage: `keel [vehicle.xml] [--defs <rom/data/definitions>]`. The definitions folder is remembered in the settings file.
+mod design;
 mod settings;
+mod theme;
 mod viewport;
 
 use eframe::egui::{self, Color32, RichText};
@@ -11,6 +13,13 @@ use keel_model::{Catalogue, CompId, Model};
 use settings::Settings;
 use std::collections::HashSet;
 use std::path::PathBuf;
+
+#[derive(PartialEq, Clone, Copy)]
+enum Mode {
+    Build,
+    Hull,
+    Decks,
+}
 
 #[derive(PartialEq, Clone, Copy)]
 enum Tool {
@@ -44,6 +53,10 @@ struct KeelApp {
     clean: bool,
     zoom: f32,
     look: Option<[f32; 3]>,
+    mode: Mode,
+    design: design::Design,
+    frame_next_hull: bool,
+    bake_on_start: bool,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -85,6 +98,10 @@ impl KeelApp {
             clean: args.clean,
             zoom: args.zoom,
             look: args.look,
+            mode: match args.mode.as_deref() { Some("hull") => Mode::Hull, Some("decks") => Mode::Decks, _ => Mode::Build },
+            design: design::Design::default(),
+            frame_next_hull: true,
+            bake_on_start: args.bake,
             settings,
         };
         if let Some([y, p]) = args.view {
@@ -127,6 +144,7 @@ impl KeelApp {
                 self.selected.clear();
                 self.status = format!("Opened {}", p.display());
                 self.settings.push_recent(&p);
+                self.design.doc = design::Design::load_for(&p);
                 self.path = Some(p);
                 self.faces_gen = u64::MAX;
                 self.frame_next = true;
@@ -138,6 +156,7 @@ impl KeelApp {
     fn save(&mut self, p: PathBuf) {
         match std::fs::write(&p, self.model.to_xml()) {
             Ok(()) => {
+                self.design.save_for(&p);
                 self.model.dirty = false;
                 self.status = format!("Saved {}", p.display());
                 self.settings.push_recent(&p);
@@ -169,10 +188,34 @@ impl KeelApp {
             self.sel().hash(&mut h);
             h.finish()
         };
-        let key = (self.faces_gen, sel_key);
+        let show_hull = self.mode == Mode::Hull && self.design.show_preview;
+        if self.mode == Mode::Hull {
+            self.design.refresh();
+            if self.faces.is_empty() && self.frame_next_hull {
+                self.cam.frame(&self.design.preview);
+                self.cam.dist /= self.zoom;
+                self.frame_next_hull = false;
+            }
+            if self.bake_on_start {
+                self.bake_on_start = false;
+                self.design.refresh();
+                if let Some(b) = self.design.bake_now() {
+                    self.apply_bake(b);
+                    self.frame_next = true;
+                    self.faces_gen = u64::MAX;
+                }
+            }
+        }
+        let key = (self.faces_gen, sel_key ^ if show_hull { self.design.generation.wrapping_mul(0x9e37_79b9) } else { 0 });
         let mut r = self.renderer.lock().unwrap();
         if r.uploaded_key != key {
-            r.set_data(viewport::vertex_data(&self.faces, &self.selected), key);
+            if show_hull {
+                let mut all = self.faces.clone();
+                all.extend(self.design.preview.iter().cloned());
+                r.set_data(viewport::vertex_data(&all, &self.selected), key);
+            } else {
+                r.set_data(viewport::vertex_data(&self.faces, &self.selected), key);
+            }
         }
     }
 
@@ -293,7 +336,11 @@ impl KeelApp {
                     self.faces_gen = u64::MAX;
                     ui.close();
                 }
-                if ui.button("Open…").clicked() {
+                if ui.button("Open…  (Ctrl+O)").clicked() {
+                    self.open_dialog();
+                    ui.close();
+                }
+                if ui.button("Open by path…").clicked() {
                     self.path_input = self.path.clone().map(|p| p.display().to_string()).unwrap_or_default();
                     self.dialog = Some(Dialog::Open);
                     ui.close();
@@ -316,8 +363,7 @@ impl KeelApp {
                     ui.close();
                 }
                 if ui.button("Save as / Export vehicle XML…").clicked() {
-                    self.path_input = self.path.clone().map(|p| p.display().to_string()).unwrap_or_default();
-                    self.dialog = Some(Dialog::SaveAs);
+                    self.save_as_dialog();
                     ui.close();
                 }
                 ui.separator();
@@ -354,14 +400,119 @@ impl KeelApp {
                     ui.close();
                 }
             });
-            ui.separator();
-            ui.selectable_value(&mut self.tool, Tool::Select, "Select");
-            ui.selectable_value(&mut self.tool, Tool::Place, "Place");
+            ui.menu_button("Design", |ui| {
+                if ui.button("Hull designer").clicked() {
+                    self.mode = Mode::Hull;
+                    ui.close();
+                }
+                if ui.button("Deck & floor plan").clicked() {
+                    self.mode = Mode::Decks;
+                    ui.close();
+                }
+            });
+            ui.menu_button("Help", |ui| {
+                ui.label("LMB orbit / select · RMB pan · wheel zoom");
+                ui.label("R rotate · S scale · arrows / PgUp / PgDn move");
+                ui.label("Del delete · Ctrl+D duplicate · Ctrl+Z / Y undo / redo · F frame");
+            });
         });
     }
 
+    fn open_dialog(&mut self) {
+        let mut d = rfd::FileDialog::new().add_filter("Stormworks vehicle", &["xml"]);
+        if let Some(dir) = self.path.as_ref().and_then(|p| p.parent()) {
+            d = d.set_directory(dir);
+        }
+        match d.pick_file() {
+            Some(p) => self.open(p),
+            None => self.status = "Open cancelled (use File → Open by path if no dialog appeared)".into(),
+        }
+    }
+
+    fn save_as_dialog(&mut self) {
+        let mut d = rfd::FileDialog::new().add_filter("Stormworks vehicle", &["xml"]).set_file_name("vehicle.xml");
+        if let Some(dir) = self.path.as_ref().and_then(|p| p.parent()) {
+            d = d.set_directory(dir);
+        }
+        match d.save_file() {
+            Some(p) => self.save(p),
+            None => {
+                self.path_input = self.path.clone().map(|p| p.display().to_string()).unwrap_or_default();
+                self.dialog = Some(Dialog::SaveAs);
+            }
+        }
+    }
+
+    /// Title row (document-editor style): product mark, document name, save state.
+    fn title_row(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("KEEL").strong().size(20.0).color(theme::CYAN));
+            ui.add_space(8.0);
+            let name = self.path.as_ref().map(|p| {
+                let dir = p.parent().and_then(|d| d.file_name()).map(|d| d.to_string_lossy().to_string()).unwrap_or_default();
+                if p.file_name().is_some_and(|f| f == "vehicle.xml") && !dir.is_empty() { dir } else { p.file_name().unwrap_or_default().to_string_lossy().to_string() }
+            });
+            ui.label(RichText::new(name.unwrap_or_else(|| "Untitled vessel".into())).size(17.0));
+            ui.add_space(10.0);
+            let (txt, col) = if self.model.dirty { ("Unsaved changes", theme::ORANGE) } else if self.path.is_some() { ("All changes saved", theme::TEXT_DIM) } else { ("Not saved yet", theme::TEXT_DIM) };
+            ui.label(RichText::new(txt).small().color(col));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.label(RichText::new("Stormworks Engineering Suite").small().color(theme::TEXT_DIM));
+            });
+        });
+    }
+
+    /// Rounded pill toolbar: history, tools, view, modes.
+    fn toolbar(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            theme::pill().show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    if ui.add_enabled(self.model.can_undo(), egui::Button::new("Undo").frame(false)).on_hover_text("Ctrl+Z").clicked() {
+                        self.model.undo();
+                    }
+                    if ui.add_enabled(self.model.can_redo(), egui::Button::new("Redo").frame(false)).on_hover_text("Ctrl+Y").clicked() {
+                        self.model.redo();
+                    }
+                    ui.separator();
+                    if theme::tool_button(ui, self.tool == Tool::Select, "Select", "Click to select, Shift/Ctrl to add") {
+                        self.tool = Tool::Select;
+                    }
+                    if theme::tool_button(ui, self.tool == Tool::Place, "Place", "Place the catalogue part under the cursor") {
+                        self.tool = Tool::Place;
+                    }
+                    ui.separator();
+                    if ui.add(egui::Button::new("Frame").frame(false)).on_hover_text("F").clicked() {
+                        self.cam.frame(&self.faces);
+                    }
+                });
+            });
+            ui.add_space(12.0);
+            theme::pill().show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    for (m, name, tip) in [(Mode::Build, "Build", "Block editor and catalogue"), (Mode::Hull, "Hull", "Parametric NURBS hull, hydrostatics, bake to blocks"), (Mode::Decks, "Decks", "Deck and floor planning, generators")] {
+                        if theme::tool_button(ui, self.mode == m, name, tip) {
+                            self.mode = m;
+                        }
+                    }
+                });
+            });
+        });
+    }
+
+    fn apply_bake(&mut self, b: design::Bake) {
+        let rem: Vec<_> = b.remove.iter().map(|p| (p.def.clone(), p.vp, p.r)).collect();
+        let add: Vec<_> = b.add.iter().map(|(p, c)| (p.def.clone(), p.vp, p.r, c.clone())).collect();
+        let (r, a) = self.model.replace_generated(0, &rem, &add);
+        self.status = format!("Hull baked: {a} blocks added, {r} previous hull blocks removed (one undo step)");
+    }
+
+    fn decks_panel(&mut self, ui: &mut egui::Ui) {
+        theme::section(ui, "Decks & floor plan");
+        ui.label("Deck planning arrives in the next step: decks at heights, rooms, and generated floors, walls, doors and railings inside the hull.");
+    }
+
     fn left_panel(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Catalogue");
+        theme::section(ui, "Catalogue");
         ui.add(egui::TextEdit::singleline(&mut self.search).hint_text("search parts"));
         ui.label(RichText::new(format!("Placing: {}", self.place_def)).small());
         egui::ScrollArea::vertical().show(ui, |ui| {
@@ -385,14 +536,14 @@ impl KeelApp {
     }
 
     fn right_panel(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Inspector");
+        theme::section(ui, "Inspector");
         let comps = self.model.components();
         let sel: Vec<_> = comps.iter().filter(|(id, _)| self.selected.contains(id)).collect();
         match sel.len() {
             0 => {
                 ui.label(format!("{} components in {} bodies", comps.len(), self.model.body_count()));
                 let mass: f64 = comps.iter().map(|(_, c)| self.catalogue.get(&c.def).map(|d| d.mass).unwrap_or(0.0)).sum();
-                ui.label(format!("Mass (definition units): {mass:.0}"));
+                ui.label(format!("Mass (definition units): {:.0}", mass.max(0.0)));
             }
             1 => {
                 let (id, c) = sel[0];
@@ -452,7 +603,7 @@ impl KeelApp {
             });
         }
         ui.separator();
-        ui.heading("Diagnostics");
+        theme::section(ui, "Diagnostics");
         egui::ScrollArea::vertical().id_salt("diag").show(ui, |ui| {
             for d in self.diags.clone() {
                 let col = match d.severity {
@@ -567,20 +718,37 @@ impl eframe::App for KeelApp {
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
 
         if !self.clean {
-        egui::Panel::top("menu").show(ui, |ui| self.menu(ui));
-        egui::Panel::bottom("status").show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(&self.status);
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(
-                        RichText::new("LMB orbit/select · RMB pan · wheel zoom · R rotate · S scale · arrows/PgUp/PgDn move · Del · Ctrl+D/Z/Y/S · F frame")
-                            .small(),
-                    );
+            egui::Panel::top("title").frame(theme::bar_frame()).show(ui, |ui| self.title_row(ui));
+            egui::Panel::top("menu").frame(theme::bar_frame()).show(ui, |ui| self.menu(ui));
+            egui::Panel::top("toolbar").frame(theme::bar_frame().inner_margin(egui::Margin::symmetric(12, 8))).show(ui, |ui| self.toolbar(ui));
+            egui::Panel::bottom("status").frame(theme::bar_frame()).show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(&self.status).small());
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let n = self.model.components().len();
+                        ui.label(RichText::new(format!("{n} parts · {} bodies", self.model.body_count())).small().color(theme::TEXT_DIM));
+                    });
                 });
             });
-        });
-        egui::Panel::left("catalogue").default_size(250.0).show(ui, |ui| self.left_panel(ui));
-        egui::Panel::right("inspector").default_size(300.0).show(ui, |ui| self.right_panel(ui));
+            let mut bake = None;
+            egui::Panel::left("left").frame(theme::side_frame()).default_size(300.0).show(ui, |ui| match self.mode {
+                Mode::Build => self.left_panel(ui),
+                Mode::Hull => {
+                    self.design.refresh();
+                    bake = self.design.params_ui(ui);
+                }
+                Mode::Decks => self.decks_panel(ui),
+            });
+            if let Some(b) = bake {
+                self.apply_bake(b);
+            }
+            egui::Panel::right("right").frame(theme::side_frame()).default_size(310.0).show(ui, |ui| {
+                if self.mode == Mode::Hull {
+                    self.design.hydro_ui(ui);
+                    ui.separator();
+                }
+                self.right_panel(ui)
+            });
         }
         egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| {
             let rect = ui.available_rect_before_wrap();
@@ -654,14 +822,20 @@ struct Args {
     clean: bool,
     zoom: f32,
     look: Option<[f32; 3]>,
+    mode: Option<String>,
+    bake: bool,
 }
 
 fn parse_args() -> Args {
-    let mut a = Args { vehicle: None, defs: None, rom: None, view: None, clean: false, zoom: 1.0, look: None };
+    let mut a = Args { vehicle: None, defs: None, rom: None, view: None, clean: false, zoom: 1.0, look: None, mode: None, bake: false };
     let mut it = std::env::args().skip(1);
     while let Some(x) = it.next() {
         if x == "--defs" {
             a.defs = it.next().map(PathBuf::from);
+        } else if x == "--bake-hull" {
+            a.bake = true;
+        } else if x == "--mode" {
+            a.mode = it.next();
         } else if x == "--zoom" {
             a.zoom = it.next().and_then(|v| v.parse().ok()).unwrap_or(1.0);
         } else if x == "--look" {
@@ -699,5 +873,12 @@ fn main() -> eframe::Result<()> {
         viewport: egui::ViewportBuilder::default().with_inner_size([1400.0, 860.0]).with_title("KEEL"),
         ..Default::default()
     };
-    eframe::run_native("KEEL", options, Box::new(|_cc| Ok(Box::new(KeelApp::new(args)))))
+    eframe::run_native(
+        "KEEL",
+        options,
+        Box::new(|cc| {
+            theme::apply(&cc.egui_ctx);
+            Ok(Box::new(KeelApp::new(args)))
+        }),
+    )
 }

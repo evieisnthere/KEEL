@@ -290,7 +290,8 @@ impl Renderer {
         gl.viewport(vp.left_px, vp.from_bottom_px, vp.width_px, vp.height_px);
         gl.enable(glow::SCISSOR_TEST);
         gl.scissor(vp.left_px, vp.from_bottom_px, vp.width_px, vp.height_px);
-        gl.clear_color(0.11, 0.135, 0.17, 1.0);
+        let c = crate::theme::CANVAS;
+        gl.clear_color(c.r() as f32 / 255.0, c.g() as f32 / 255.0, c.b() as f32 / 255.0, 1.0);
         gl.depth_mask(true);
         gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
         gl.enable(glow::DEPTH_TEST);
@@ -351,6 +352,33 @@ pub fn show(ui: &mut egui::Ui, cam: &mut Camera, renderer: &Arc<Mutex<Renderer>>
     let painter = ui.painter_at(rect);
     painter.add(egui::PaintCallback { rect, callback: Arc::new(cb) });
 
+    // blueprint grid on the y = 0 plane around the camera target (1 m minor, 5 m major)
+    {
+        let step = if cam.dist > 120.0 { 5.0 } else { 1.0 };
+        let n = 30;
+        let cx = (cam.target[0] / step).round() * step;
+        let cz = (cam.target[2] / step).round() * step;
+        for k in -n..=n {
+            let major = ((k as f32 * step + cx) / (step * 5.0)).fract().abs() < 1e-3;
+            let col = if major { crate::theme::GRID.gamma_multiply(1.6) } else { crate::theme::GRID };
+            for (a, b) in [
+                ([cx + k as f32 * step, 0.0, cz - n as f32 * step], [cx + k as f32 * step, 0.0, cz + n as f32 * step]),
+                ([cx - n as f32 * step, 0.0, cz + k as f32 * step], [cx + n as f32 * step, 0.0, cz + k as f32 * step]),
+            ] {
+                // clip the segment to the region in front of the camera
+                let (ca, cb) = (view.cam(a), view.cam(b));
+                let near = view.near * 2.0;
+                if ca[2] < near && cb[2] < near {
+                    continue;
+                }
+                let lerp = |p: [f32; 3], q: [f32; 3], t: f32| [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t];
+                let (a2, b2) = if ca[2] < near { (lerp(a, b, (near - ca[2]) / (cb[2] - ca[2])), b) } else if cb[2] < near { (a, lerp(b, a, (near - cb[2]) / (ca[2] - cb[2]))) } else { (a, b) };
+                if let (Some(p), Some(q)) = (view.project(a2), view.project(b2)) {
+                    painter.line_segment([p.0, q.0], Stroke::new(if major { 1.0 } else { 0.6 }, col));
+                }
+            }
+        }
+    }
     if let Some(g) = ghost {
         for f in g {
             let pts: Vec<Pos2> = f.verts.iter().filter_map(|v| view.project(*v).map(|x| x.0)).collect();

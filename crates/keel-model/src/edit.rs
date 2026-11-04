@@ -333,10 +333,41 @@ impl Model {
         out
     }
 
+    /// Replace generated content in one undo step: remove components matching `remove` (definition, voxel,
+    /// rotation) from `body`, then add `add` (definition, voxel, rotation, base colour).
+    pub fn replace_generated(&mut self, body: usize, remove: &[(String, [i32; 3], [i32; 9])], add: &[(String, [i32; 3], [i32; 9], String)]) -> (usize, usize) {
+        if self.components_el_mut(body).is_none() {
+            return (0, 0);
+        }
+        self.checkpoint();
+        let want: std::collections::HashSet<(String, [i32; 3], [i32; 9])> = remove.iter().cloned().collect();
+        let ids: Vec<CompId> = self
+            .components()
+            .into_iter()
+            .filter(|(id, c)| id.body == body && want.contains(&(c.def.clone(), c.voxel, c.rotation)))
+            .map(|(id, _)| id)
+            .collect();
+        let removed = ids.len();
+        let undo_len = self.undo.len();
+        self.delete(&ids);
+        self.undo.truncate(undo_len); // keep a single checkpoint for the whole operation
+        let mut added = 0;
+        for (def, vp, r, bc) in add {
+            if self.add_inner(body, def, *vp, *r, Some(bc)).is_some() {
+                added += 1;
+            }
+        }
+        (removed, added)
+    }
+
     /// Add a new component of definition `def` at voxel `vp` (body `body`).
     pub fn add(&mut self, body: usize, def: &str, vp: [i32; 3], rotation: [i32; 9]) -> Option<CompId> {
         self.components_el_mut(body)?;
         self.checkpoint();
+        self.add_inner(body, def, vp, rotation, None)
+    }
+
+    fn add_inner(&mut self, body: usize, def: &str, vp: [i32; 3], rotation: [i32; 9], bc: Option<&str>) -> Option<CompId> {
         let mut c = Element::new("c");
         if def != "01_block" {
             c.set("d", def);
@@ -346,6 +377,10 @@ impl Model {
             o.set("r", &rotation.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(","));
         }
         o.set("sc", "6,x,x,x,x,x,x");
+        if let Some(bc) = bc {
+            o.set("bc", bc);
+            o.set("ac", bc);
+        }
         let mut vpe = Element::new("vp");
         for (i, a) in ["x", "y", "z"].iter().enumerate() {
             if vp[i] != 0 {
