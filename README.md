@@ -29,7 +29,7 @@ What exists today:
 | Fluids & electrical | Pressure/transfer/pump laws (RE-0010); battery pool, motors, generators (RE-0011) |
 | Waterline | **Estimate** for now (envelope z-scan). The exact game flooding model is parked (RE-0004 §8) |
 | Logic & steering | Microcontroller format, catalogue and tick semantics (RE-0013); rudders, fins, control surfaces and keels (RE-0012) |
-| Application | **Phase 1 started:** `keel` desktop app (Rust, egui): 3D viewer and block editor with undo, a catalogue, the scale tool and diagnostics (`crates/keel-app`, `crates/keel-model`) |
+| Application | **Alpha 0.0.1:** `keel` desktop app (Rust, egui) with Build, Hull, Decks, Power and Logic modes (see below) |
 
 A first end-to-end result: the workshop boat 3556526754 ("Your Boat", two 12-cylinder modular engines, 3:1 gearboxes, two
 propellers) simulated purely from its file reaches **28.9 kn, limited by the 3600 RPM rev limiter**. Its waterline is
@@ -113,19 +113,29 @@ Requirements: Python 3.11+ (`pytest`, `numpy`, `scipy` for some tools). Rust is 
 KEEL_CORPUS=/path/to/your/files ./build.sh corpus   # round-trip your own vehicle/definition XML and meshes
 ```
 
-### The KEEL application (Phase 1, in progress)
+### The KEEL application (alpha 0.0.1)
+
+Download `keel` (Linux) or `keel.exe` (Windows) from the GitHub release, or build it:
 
 ```bash
 ./build.sh run /path/to/vehicle.xml --defs /path/to/Stormworks/rom/data/definitions
 ```
-The definitions folder is remembered (File → Settings), or set it with the `KEEL_DEFINITIONS` environment variable. What works now:
-- open a vehicle and view it in 3D with the real block shapes (from the game's surface tables) and paint colours;
-- orbit, pan and zoom; select, multi-select (Shift), move (arrows, PgUp/PgDn), rotate (R), duplicate, delete;
-- place parts from the catalogue; undo/redo; save or export;
-- the **Scale** tool (S) writes workshop-style XML scale edits. It always warns that sealing is only guaranteed at the block's origin voxel;
-- diagnostics. Untouched XML is saved byte-for-byte, including other people's scale and merge edits.
+KEEL reads your own game files and never copies or bundles them. Point it at `rom/data/definitions` (File → Settings,
+`--defs`, or the `KEEL_DEFINITIONS` environment variable). Real part meshes are used when `--rom /path/to/rom` is given.
 
-Linux needs the usual desktop libraries at runtime (X11 or Wayland, OpenGL, `libxkbcommon-x11`). Windows needs nothing extra.
+| Mode | What it does |
+|---|---|
+| **Build** | 3D editor for native vehicles. Thumbnail part palette by game category with search, favourites (right-click) and recent parts. Tools: Select, Place (R / Shift+R / Alt+R rotate), Paint (Alt+click picks a colour), box Fill, Measure, Wire (ports coloured by type, click output then input). Mirror across the centre line (M), Ctrl+C / Ctrl+V stamps, undo/redo, the Scale tool with its sealing warning, diagnostics including dangling wires |
+| **Hull** | Parametric hull with real-world hydrostatics. Bakes to smooth blocks built the way a builder would: deck-edge curve from wedges, then pyramids down the sides |
+| **Decks** | Choose a boat type (cruise ship, Ro/Pax ferry, workboat, tug, motor yacht, passenger ferry, patrol, rescue) and it lists the rooms it needs. Set deck heights, watch the floor plan update live in its own window, then generate walls, doors, furniture, windows, lights (kelvin colour, dimmer in dim rooms), per-room switches wired through push-to-toggles with a master control, a battery bus, the superstructure, stairs and ladders |
+| **Power** | Modular engine + gearbox + propeller and electric motor + battery calculators, with a design search. Speeds use a thrust calibration factor until in-game test C1 sets it |
+| **Logic** | Microcontroller editor: node canvas with all 60 component types, wires, IO nodes and footprint, settings with expression checking, and a tick simulator that follows the game's one-tick-per-component order. Edits are lossless: everything KEEL does not edit is written back byte for byte |
+
+Untouched XML is saved byte-for-byte, including other people's scale and merge edits. Linux needs the usual desktop
+libraries (X11 or Wayland, OpenGL, `libxkbcommon-x11`); Windows needs nothing extra.
+
+This is an alpha: export has not yet been confirmed in game for every generator, and predictions marked as estimates in
+[`docs/OPEN-ITEMS.md`](docs/OPEN-ITEMS.md) are estimates.
 
 Offline report for one of your vehicles (needs your `rom/data/definitions` folder):
 

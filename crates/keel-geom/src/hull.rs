@@ -72,6 +72,26 @@ impl Default for HullParams {
 }
 
 
+/// Named starting points for the hull designer.
+pub fn presets() -> Vec<(&'static str, HullParams)> {
+    let d = HullParams::default();
+    vec![
+        ("Workboat", d.clone()),
+        (
+            "Planing",
+            HullParams { length: 9.0, beam: 3.0, depth: 1.5, draft: 0.5, deadrise_deg: 20.0, bow_deadrise_deg: 45.0, bilge: 0.05, flare_deg: 12.0, entrance: 0.4, entrance_fullness: 1.2, run: 0.0, transom_width: 0.92, transom_lift: 0.0, forefoot: 0.7, sheer_bow: 0.3, sheer_stern: 0.0, ..d.clone() },
+        ),
+        (
+            "Trawler",
+            HullParams { length: 24.0, beam: 7.0, depth: 3.6, draft: 2.6, deadrise_deg: 8.0, bow_deadrise_deg: 35.0, bilge: 0.45, flare_deg: 14.0, entrance: 0.45, entrance_fullness: 2.2, run: 0.35, transom_width: 0.7, transom_lift: 0.6, forefoot: 0.35, sheer_bow: 1.4, sheer_stern: 0.3, ..d.clone() },
+        ),
+        (
+            "Barge",
+            HullParams { length: 30.0, beam: 9.0, depth: 2.5, draft: 1.2, deadrise_deg: 0.0, bow_deadrise_deg: 0.0, bilge: 0.0, flare_deg: 0.0, entrance: 0.12, entrance_fullness: 0.8, run: 0.08, transom_width: 1.0, transom_lift: 0.9, forefoot: 0.8, sheer_bow: 0.0, sheer_stern: 0.0, ..d },
+        ),
+    ]
+}
+
 fn smooth(t: f64) -> f64 {
     let t = t.clamp(0.0, 1.0);
     t * t * (3.0 - 2.0 * t)

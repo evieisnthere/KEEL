@@ -3,6 +3,30 @@
 use keel_io::vehicle::{DEFAULT_ROTATION, IDENTITY};
 use keel_io::xml::{self, Document, Element, Node};
 
+/// World voxel of a port at `pos` (component-local) on a component at `vp` with rotation `r` (column-major,
+/// M[i][j] = r[3j + i], as everywhere in KEEL).
+pub fn port_voxel(vp: [i32; 3], r: &[i32; 9], pos: [i32; 3]) -> [i32; 3] {
+    [0, 1, 2].map(|i| vp[i] + r[i] * pos[0] + r[3 + i] * pos[1] + r[6 + i] * pos[2])
+}
+
+/// A generated part: definition, voxel, rotation and optional paint (`bc` block colour, `ac` additive / light colour).
+#[derive(Debug, Clone, PartialEq)]
+pub struct GenPart {
+    pub def: String,
+    pub vp: [i32; 3],
+    pub r: [i32; 9],
+    pub bc: Option<String>,
+    pub ac: Option<String>,
+}
+
+/// A generated wire (`logic_node_link`) between two port voxels. `kind` as in [`crate::catalogue::LogicNode`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct GenLink {
+    pub kind: i32,
+    pub a: [i32; 3],
+    pub b: [i32; 3],
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CompId {
     pub body: usize,
@@ -360,6 +384,148 @@ impl Model {
         (removed, added)
     }
 
+    /// Apply a generated build as one undo step: remove the components listed in `remove` (def, voxel, rotation), add
+    /// `parts` and the wires `links`. Returns (removed, added parts, added links).
+    pub fn apply_build(&mut self, body: usize, remove: &[(String, [i32; 3], [i32; 9])], parts: &[GenPart], links: &[GenLink]) -> (usize, usize, usize) {
+        self.apply_build_replacing(body, remove, &[], parts, links)
+    }
+
+    /// As [`Model::apply_build`], also removing the wires `remove_links` (a previous generation's).
+    pub fn apply_build_replacing(&mut self, body: usize, remove: &[(String, [i32; 3], [i32; 9])], remove_links: &[GenLink], parts: &[GenPart], links: &[GenLink]) -> (usize, usize, usize) {
+        if self.components_el_mut(body).is_none() {
+            return (0, 0, 0);
+        }
+        self.checkpoint();
+        let want: std::collections::HashSet<(String, [i32; 3], [i32; 9])> = remove.iter().cloned().collect();
+        let ids: Vec<CompId> = self
+            .components()
+            .into_iter()
+            .filter(|(id, c)| id.body == body && want.contains(&(c.def.clone(), c.voxel, c.rotation)))
+            .map(|(id, _)| id)
+            .collect();
+        let removed = ids.len();
+        let undo_len = self.undo.len();
+        self.delete(&ids);
+        self.undo.truncate(undo_len);
+        let mut added = 0;
+        for p in parts {
+            if let Some(id) = self.add_inner(body, &p.def, p.vp, p.r, p.bc.as_deref()) {
+                added += 1;
+                if let Some(ac) = &p.ac {
+                    if let Some(o) = self.component_o_mut(id) {
+                        o.set("ac", ac);
+                    }
+                }
+            }
+        }
+        let mut nl = 0;
+        if self.doc.root.find("logic_node_links").is_none() {
+            self.doc.root.push(Element::new("logic_node_links"));
+        }
+        if let Some(ls) = self.doc.root.find_mut("logic_node_links") {
+            if !remove_links.is_empty() {
+                let pos = |e: &Element, tag: &str| -> [i32; 3] {
+                    let p = e.find(tag);
+                    [0, 1, 2].map(|i| p.and_then(|p| p.get(["x", "y", "z"][i])).and_then(|v| v.parse().ok()).unwrap_or(0))
+                };
+                let gone: std::collections::HashSet<(i32, [i32; 3], [i32; 3])> = remove_links.iter().map(|l| (l.kind, l.a, l.b)).collect();
+                ls.children.retain(|c| match c {
+                    keel_io::xml::Node::Element(e) if e.tag == "logic_node_link" => {
+                        let k = e.get("type").and_then(|v| v.parse().ok()).unwrap_or(0);
+                        !gone.contains(&(k, pos(e, "voxel_pos_0"), pos(e, "voxel_pos_1")))
+                    }
+                    _ => true,
+                });
+            }
+            for l in links {
+                let mut e = Element::new("logic_node_link");
+                e.set("type", &l.kind.to_string());
+                for (tag, v) in [("voxel_pos_0", l.a), ("voxel_pos_1", l.b)] {
+                    let mut p = Element::new(tag);
+                    for (i, a) in ["x", "y", "z"].iter().enumerate() {
+                        if v[i] != 0 {
+                            p.set(a, &v[i].to_string());
+                        }
+                    }
+                    e.push(p);
+                }
+                ls.push(e);
+                nl += 1;
+            }
+        }
+        self.generation += 1;
+        (removed, added, nl)
+    }
+
+    /// All wires (`logic_node_links`).
+    pub fn links(&self) -> Vec<GenLink> {
+        let Some(ls) = self.doc.root.find("logic_node_links") else { return vec![] };
+        ls.elements()
+            .filter(|e| e.tag == "logic_node_link")
+            .map(|e| {
+                let pos = |tag: &str| -> [i32; 3] {
+                    let p = e.find(tag);
+                    [0, 1, 2].map(|k| p.and_then(|p| p.get(["x", "y", "z"][k])).and_then(|v| v.parse().ok()).unwrap_or(0))
+                };
+                GenLink { kind: e.get("type").and_then(|v| v.parse().ok()).unwrap_or(0), a: pos("voxel_pos_0"), b: pos("voxel_pos_1") }
+            })
+            .collect()
+    }
+
+    /// Add one wire (one undo step).
+    pub fn add_link(&mut self, link: GenLink) {
+        self.apply_build_replacing(0, &[], &[], &[], &[link]);
+    }
+
+    /// Remove wires (one undo step).
+    pub fn remove_links(&mut self, links: &[GenLink]) {
+        self.apply_build_replacing(0, &[], links, &[], &[]);
+    }
+
+    /// Set block / additive paint on components (one undo step). `None` leaves that attribute as it is.
+    pub fn set_paint(&mut self, ids: &[CompId], bc: Option<&str>, ac: Option<&str>) {
+        if ids.is_empty() {
+            return;
+        }
+        self.checkpoint();
+        for id in ids {
+            if let Some(o) = self.component_o_mut(*id) {
+                if let Some(c) = bc {
+                    o.set("bc", c);
+                }
+                if let Some(c) = ac {
+                    o.set("ac", c);
+                }
+            }
+        }
+        self.generation += 1;
+        self.dirty = true;
+    }
+
+    /// The `microprocessor_definition` of a microcontroller component (a copy), if it has one.
+    pub fn mc_definition(&self, id: CompId) -> Option<Element> {
+        self.component_element(id)?.find("o")?.find("microprocessor_definition").cloned()
+    }
+
+    /// Replace (or add) a microcontroller component's definition (one undo step).
+    pub fn set_mc_definition(&mut self, id: CompId, def: Element) -> bool {
+        if self.component_o_mut(id).is_none() {
+            return false;
+        }
+        self.checkpoint();
+        let o = self.component_o_mut(id).unwrap();
+        match o.find_mut("microprocessor_definition") {
+            Some(e) => *e = def,
+            None => o.insert(0, def),
+        }
+        true
+    }
+
+    fn component_o_mut(&mut self, id: CompId) -> Option<&mut Element> {
+        let cs = self.components_el_mut(id.body)?;
+        cs.elements_mut().filter(|e| e.tag == "c").nth(id.comp)?.find_mut("o")
+    }
+
     /// Add a new component of definition `def` at voxel `vp` (body `body`).
     pub fn add(&mut self, body: usize, def: &str, vp: [i32; 3], rotation: [i32; 9]) -> Option<CompId> {
         self.components_el_mut(body)?;
@@ -395,3 +561,49 @@ impl Model {
         Some(CompId { body, comp: n })
     }
 }
+
+#[cfg(test)]
+mod apply_build_tests {
+    use super::*;
+
+    #[test]
+    fn apply_build_adds_parts_paint_and_links_in_one_undo_step() {
+        let mut m = Model::new_empty();
+        let parts = vec![
+            GenPart { def: "small_light".into(), vp: [1, 2, 3], r: IDENTITY, bc: None, ac: Some("FFD9A0".into()) },
+            GenPart { def: "button_push".into(), vp: [0, 2, 3], r: IDENTITY, bc: None, ac: None },
+        ];
+        let links = vec![GenLink { kind: 0, a: [0, 2, 3], b: [1, 2, 3] }];
+        let (_, added, nl) = m.apply_build(0, &[], &parts, &links);
+        assert_eq!((added, nl), (2, 1));
+        let x = m.to_xml();
+        assert!(x.contains("ac=\"FFD9A0\""), "{x}");
+        assert!(x.contains("<logic_node_link type=\"0\">"), "{x}");
+        assert!(m.undo());
+        assert!(!m.to_xml().contains("small_light"));
+    }
+
+    #[test]
+    fn links_paint_and_undo() {
+        let mut m = Model::new_empty();
+        let id = m.add(0, "01_block", [0, 0, 0], IDENTITY).unwrap();
+        m.add_link(GenLink { kind: 0, a: [1, 0, 0], b: [2, 0, 0] });
+        assert_eq!(m.links().len(), 1);
+        m.remove_links(&m.links());
+        assert!(m.links().is_empty());
+        assert!(m.undo());
+        assert_eq!(m.links().len(), 1);
+        m.set_paint(&[id], Some("FF0000"), None);
+        assert!(m.to_xml().contains("bc=\"FF0000\""));
+        assert!(m.undo());
+        assert!(!m.to_xml().contains("FF0000"));
+    }
+
+    #[test]
+    fn port_voxel_rotates_column_major() {
+        // quarter turn about y: local +x maps to world -z
+        let r = [0, 0, -1, 0, 1, 0, 1, 0, 0];
+        assert_eq!(port_voxel([5, 0, 0], &r, [1, 0, 0]), [5, 0, -1]);
+    }
+}
+

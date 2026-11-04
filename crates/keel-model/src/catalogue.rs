@@ -30,6 +30,19 @@ pub struct Definition {
     pub solid_voxels: Vec<[i32; 3]>,
     pub surfaces: Vec<Surface>,
     pub buoyancy_surfaces: Vec<Surface>,
+    /// logic / electric / fluid / torque ports (RE-0008 §1)
+    pub logic_nodes: Vec<LogicNode>,
+}
+
+/// A port on a component: `mode` 0 = output, 1 = input; `kind` 0 bool, 1 number, 2 torque, 3 fluid, 4 electric,
+/// 5 composite, 6 video, 7 audio; `position` is the voxel within the component (before rotation).
+#[derive(Debug, Clone, PartialEq)]
+pub struct LogicNode {
+    pub label: String,
+    pub mode: i32,
+    pub kind: i32,
+    pub orientation: i32,
+    pub position: [i32; 3],
 }
 
 fn v3(e: Option<&Element>) -> [i32; 3] {
@@ -63,6 +76,11 @@ fn surfaces(root: &Element, tag: &str) -> Vec<Surface> {
 }
 
 impl Definition {
+    /// First port with this label (case-insensitive prefix match) and kind.
+    pub fn node(&self, label: &str, kind: i32) -> Option<&LogicNode> {
+        let l = label.to_lowercase();
+        self.logic_nodes.iter().find(|n| n.kind == kind && n.label.to_lowercase().starts_with(&l))
+    }
     pub fn from_xml(id: &str, src: &str) -> Result<Self, String> {
         let doc = xml::parse(src).map_err(|e| e.to_string())?;
         let r = &doc.root;
@@ -96,6 +114,15 @@ impl Definition {
             solid_voxels,
             surfaces: surfaces(r, "surfaces"),
             buoyancy_surfaces: surfaces(r, "buoyancy_surfaces"),
+            logic_nodes: r
+                .find("logic_nodes")
+                .map(|n| {
+                    n.elements()
+                        .filter(|e| e.tag == "logic_node")
+                        .map(|e| LogicNode { label: e.get("label").unwrap_or_default(), mode: num(e, "mode"), kind: num(e, "type"), orientation: num(e, "orientation"), position: v3(e.find("position")) })
+                        .collect()
+                })
+                .unwrap_or_default(),
         })
     }
 }
@@ -151,6 +178,7 @@ impl Catalogue {
                 solid_voxels: vec![[0, 0, 0]],
                 surfaces: faces.clone(),
                 buoyancy_surfaces: faces,
+                logic_nodes: vec![],
             },
         );
         c

@@ -1,0 +1,13 @@
+[package]
+name = "keel-layout"
+description = "KEEL interior design: boat programmes, floor plans, furniture, lighting and electrics, stairs, superstructures"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+keel-model = { path = "../keel-model" }
+keel-io = { path = "../keel-io" }
+keel-geom = { path = "../keel-geom" }

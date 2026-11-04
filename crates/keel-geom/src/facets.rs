@@ -137,6 +137,11 @@ fn block_pts8(bt: i32) -> Vec<[i32; 3]> {
     block_points(bt).unwrap().into_iter().map(|p| p.map(|x| (x * 8.0).round() as i32)).collect()
 }
 
+/// Public wrapper of [`match_block`] for other builders.
+pub fn match_block_pub(bts: &[(i32, &'static str)], want: &[[i32; 3]]) -> Option<(&'static str, [i32; 9], [i32; 3])> {
+    match_block(bts, want)
+}
+
 /// Find (def, r, anchor voxel) whose solid's corner set equals `want` (eighth-metre units).
 fn match_block(bts: &[(i32, &'static str)], want: &[[i32; 3]]) -> Option<(&'static str, [i32; 9], [i32; 3])> {
     let mut w: Vec<[i32; 3]> = want.to_vec();

@@ -13,6 +13,9 @@ path = "src/main.rs"
 keel-io = { path = "../keel-io" }
 keel-model = { path = "../keel-model" }
 keel-geom = { path = "../keel-geom" }
+keel-layout = { path = "../keel-layout" }
+keel-power = { path = "../keel-power" }
+keel-mc = { path = "../keel-mc" }
 eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts", "x11", "wayland", "__screenshot"] }
 serde_json = "1"
 serde = { version = "1.0.229", features = ["derive"] }

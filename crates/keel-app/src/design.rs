@@ -20,11 +20,15 @@ pub struct DesignDoc {
     pub bottom: String,
     /// placements written by the last bake (removed again on re-bake)
     pub baked: Vec<Placement>,
+    /// interior design (Decks mode)
+    pub interior: crate::interior::InteriorDoc,
+    /// powertrain design (Power mode)
+    pub power: crate::power::PowerDoc,
 }
 
 impl Default for DesignDoc {
     fn default() -> Self {
-        DesignDoc { hull: HullParams::default(), origin: [0, 0, 0], shell: 1, deck: true, topside: "E8E8E4".into(), bottom: "7A2A1E".into(), baked: vec![] }
+        DesignDoc { hull: HullParams::default(), origin: [0, 0, 0], shell: 1, deck: true, topside: "E8E8E4".into(), bottom: "7A2A1E".into(), baked: vec![], interior: Default::default(), power: Default::default() }
     }
 }
 
@@ -153,7 +157,7 @@ impl Design {
                 bake = self.bake();
             }
             ui.label(
-                RichText::new("Facet builder: the NURBS surface is quantised to block gradients (1:1, 1:2, 1:4 wedges; 1x1, 1x2, 1x4, 2x2, 2x4, 4x4 pyramid/inverse-pyramid pairs), so faces are planar and meet edge to edge. Standard blocks only, no XML scale edits.")
+                RichText::new("Lattice builder: side and bottom are additive height fields quantised to block gradients; every tile is one wedge or pyramid/inverse-pyramid pair, so faces are planar and continuous. One-voxel shell. Standard blocks only, no XML scale edits.")
                     .small()
                     .color(theme::TEXT_DIM),
             );
@@ -172,8 +176,8 @@ impl Design {
         let hull = self.hull.as_ref()?;
         let t = std::time::Instant::now();
         let o = self.doc.origin;
-        let solid = keel_geom::HullSolid::new(hull);
-        let placed = keel_geom::facets::build(&solid, &keel_geom::facets::FacetOptions { shell: self.doc.shell, origin: o, frame_offset: [0.0, 0.125, 0.0] });
+        let built = keel_geom::hullblocks::build(hull, &keel_geom::hullblocks::HullBlockOptions { origin: o, deck: self.doc.deck });
+        let placed = built.placements;
         let wl = (self.doc.hull.draft / keel_geom::voxel::VOXEL).round() as i32 + o[1];
         let add = placed.iter().map(|p| (p.clone(), if p.vp[1] < wl { self.doc.bottom.clone() } else { self.doc.topside.clone() })).collect::<Vec<_>>();
         let remove = std::mem::replace(&mut self.doc.baked, placed);
@@ -183,6 +187,11 @@ impl Design {
 
     /// Right panel: hydrostatics readout.
     pub fn hydro_ui(&self, ui: &mut egui::Ui) {
+        let p = &self.doc.hull;
+        // the game refuses vehicles larger than its editor volumes (RE-0003 load-time validation): about 58 m long
+        if p.length > 58.25 || p.beam > 23.5 {
+            ui.label(RichText::new(format!("Too large for the game: {:.1} × {:.1} m. Vehicles must fit about 58 m long and 23.5 m wide (RE-0003); split the ship or scale it down.", p.length, p.beam)).color(theme::RED));
+        }
         theme::section(ui, "Hydrostatics (real world, sea water)");
         let Some(h) = &self.hydro else {
             ui.label(RichText::new("Hull could not be built from these parameters").color(theme::ORANGE));
@@ -221,22 +230,7 @@ fn sidecar(path: &std::path::Path) -> std::path::PathBuf {
 
 /// Presets spanning common real hull families (realistic by default).
 pub fn presets() -> Vec<(&'static str, HullParams)> {
-    let d = HullParams::default();
-    vec![
-        ("Workboat", d.clone()),
-        (
-            "Planing",
-            HullParams { length: 9.0, beam: 3.0, depth: 1.5, draft: 0.5, deadrise_deg: 20.0, bow_deadrise_deg: 45.0, bilge: 0.05, flare_deg: 12.0, entrance: 0.4, entrance_fullness: 1.2, run: 0.0, transom_width: 0.92, transom_lift: 0.0, forefoot: 0.7, sheer_bow: 0.3, sheer_stern: 0.0, ..d.clone() },
-        ),
-        (
-            "Trawler",
-            HullParams { length: 24.0, beam: 7.0, depth: 3.6, draft: 2.6, deadrise_deg: 8.0, bow_deadrise_deg: 35.0, bilge: 0.45, flare_deg: 14.0, entrance: 0.45, entrance_fullness: 2.2, run: 0.35, transom_width: 0.7, transom_lift: 0.6, forefoot: 0.35, sheer_bow: 1.4, sheer_stern: 0.3, ..d.clone() },
-        ),
-        (
-            "Barge",
-            HullParams { length: 30.0, beam: 9.0, depth: 2.5, draft: 1.2, deadrise_deg: 0.0, bow_deadrise_deg: 0.0, bilge: 0.0, flare_deg: 0.0, entrance: 0.12, entrance_fullness: 0.8, run: 0.08, transom_width: 1.0, transom_lift: 0.9, forefoot: 0.8, sheer_bow: 0.0, sheer_stern: 0.0, ..d },
-        ),
-    ]
+    keel_geom::hull::presets()
 }
 
 /// Translucent preview of the NURBS surface (both halves), in vehicle metres at the design origin.

@@ -1,0 +1,9 @@
+[package]
+name = "keel-mc"
+description = "KEEL microcontroller toolkit: component table, lossless graph editing, tick simulator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+keel-io = { path = "../keel-io" }
