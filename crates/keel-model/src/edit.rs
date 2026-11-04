@@ -457,6 +457,51 @@ impl Model {
         (removed, added, nl)
     }
 
+    /// All wires (`logic_node_links`).
+    pub fn links(&self) -> Vec<GenLink> {
+        let Some(ls) = self.doc.root.find("logic_node_links") else { return vec![] };
+        ls.elements()
+            .filter(|e| e.tag == "logic_node_link")
+            .map(|e| {
+                let pos = |tag: &str| -> [i32; 3] {
+                    let p = e.find(tag);
+                    [0, 1, 2].map(|k| p.and_then(|p| p.get(["x", "y", "z"][k])).and_then(|v| v.parse().ok()).unwrap_or(0))
+                };
+                GenLink { kind: e.get("type").and_then(|v| v.parse().ok()).unwrap_or(0), a: pos("voxel_pos_0"), b: pos("voxel_pos_1") }
+            })
+            .collect()
+    }
+
+    /// Add one wire (one undo step).
+    pub fn add_link(&mut self, link: GenLink) {
+        self.apply_build_replacing(0, &[], &[], &[], &[link]);
+    }
+
+    /// Remove wires (one undo step).
+    pub fn remove_links(&mut self, links: &[GenLink]) {
+        self.apply_build_replacing(0, &[], links, &[], &[]);
+    }
+
+    /// Set block / additive paint on components (one undo step). `None` leaves that attribute as it is.
+    pub fn set_paint(&mut self, ids: &[CompId], bc: Option<&str>, ac: Option<&str>) {
+        if ids.is_empty() {
+            return;
+        }
+        self.checkpoint();
+        for id in ids {
+            if let Some(o) = self.component_o_mut(*id) {
+                if let Some(c) = bc {
+                    o.set("bc", c);
+                }
+                if let Some(c) = ac {
+                    o.set("ac", c);
+                }
+            }
+        }
+        self.generation += 1;
+        self.dirty = true;
+    }
+
     fn component_o_mut(&mut self, id: CompId) -> Option<&mut Element> {
         let cs = self.components_el_mut(id.body)?;
         cs.elements_mut().filter(|e| e.tag == "c").nth(id.comp)?.find_mut("o")
@@ -517,6 +562,22 @@ mod apply_build_tests {
         assert!(x.contains("<logic_node_link type=\"0\">"), "{x}");
         assert!(m.undo());
         assert!(!m.to_xml().contains("small_light"));
+    }
+
+    #[test]
+    fn links_paint_and_undo() {
+        let mut m = Model::new_empty();
+        let id = m.add(0, "01_block", [0, 0, 0], IDENTITY).unwrap();
+        m.add_link(GenLink { kind: 0, a: [1, 0, 0], b: [2, 0, 0] });
+        assert_eq!(m.links().len(), 1);
+        m.remove_links(&m.links());
+        assert!(m.links().is_empty());
+        assert!(m.undo());
+        assert_eq!(m.links().len(), 1);
+        m.set_paint(&[id], Some("FF0000"), None);
+        assert!(m.to_xml().contains("bc=\"FF0000\""));
+        assert!(m.undo());
+        assert!(!m.to_xml().contains("FF0000"));
     }
 
     #[test]

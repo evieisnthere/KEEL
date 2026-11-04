@@ -2,7 +2,11 @@
 //!
 //! Usage: `keel [vehicle.xml] [--defs <rom/data/definitions>]`. The definitions folder is remembered in the settings file.
 mod design;
+mod icons;
 mod interior;
+mod palette;
+mod tools;
+mod wiring;
 mod power;
 mod settings;
 mod theme;
@@ -24,11 +28,7 @@ enum Mode {
     Power,
 }
 
-#[derive(PartialEq, Clone, Copy)]
-enum Tool {
-    Select,
-    Place,
-}
+use tools::Tool;
 
 struct KeelApp {
     settings: Settings,
@@ -43,7 +43,9 @@ struct KeelApp {
     tool: Tool,
     place_def: String,
     place_body: usize,
-    search: String,
+    palette: palette::Palette,
+    wiring: wiring::Wiring,
+    tools: tools::Tools,
     path_input: String,
     defs_input: String,
     dialog: Option<Dialog>,
@@ -90,7 +92,9 @@ impl KeelApp {
             tool: Tool::Select,
             place_def: "01_block".into(),
             place_body: 0,
-            search: String::new(),
+            palette: palette::Palette::default(),
+            wiring: wiring::Wiring::default(),
+            tools: tools::Tools::default(),
             path_input: String::new(),
             defs_input: settings.definitions_dir.clone().map(|p| p.display().to_string()).unwrap_or_default(),
             dialog: None,
@@ -111,6 +115,12 @@ impl KeelApp {
             bake_on_start: args.bake,
             settings,
         };
+        if let Some(t) = &args.tool {
+            if let Some((tool, ..)) = Tool::ALL.iter().find(|(_, _, n, _)| n.eq_ignore_ascii_case(t)) {
+                app.tool = *tool;
+                app.wiring.all = true;
+            }
+        }
         if let Some([y, p]) = args.view {
             app.cam.yaw = y;
             app.cam.pitch = p;
@@ -252,6 +262,19 @@ impl KeelApp {
             return;
         }
         let ids = self.sel();
+        let (copy, paste, mirror) = ctx.input(|i| (i.modifiers.command && i.key_pressed(egui::Key::C), i.modifiers.command && i.key_pressed(egui::Key::V), !i.modifiers.command && i.key_pressed(egui::Key::M)));
+        if copy && !ids.is_empty() {
+            self.copy_selection();
+        }
+        if paste && !self.tools.clipboard.is_empty() {
+            self.tool = Tool::Place;
+            self.tools.stamping = true;
+            self.status = format!("Stamp: {} parts; click to paste, Esc to stop", self.tools.clipboard.len());
+        }
+        if mirror {
+            self.tools.mirror = !self.tools.mirror;
+            self.status = format!("Mirror {}", if self.tools.mirror { "on: placing, filling and painting are mirrored across the centre line" } else { "off" });
+        }
         let (undo, redo, del, dup, rot, esc, mv, frame, save, scale) = ctx.input(|i| {
             let ctrl = i.modifiers.command;
             let mut mv = [0; 3];
@@ -293,7 +316,11 @@ impl KeelApp {
         if redo && self.model.redo() {
             self.status = "Redo".into();
         }
-        if del && !ids.is_empty() {
+        if del && self.tool == Tool::Wire && self.wiring.selected.is_some() {
+            let l = self.wiring.selected.take().unwrap();
+            self.model.remove_links(&[l]);
+            self.status = "Wire removed".into();
+        } else if del && !ids.is_empty() {
             let n = self.model.delete(&ids);
             self.selected.clear();
             self.status = format!("Deleted {n} component(s)");
@@ -304,7 +331,14 @@ impl KeelApp {
             self.status = "Duplicated (offset +1 Y)".into();
         }
         if let Some(axis) = rot {
-            if !ids.is_empty() {
+            if matches!(self.tool, Tool::Place | Tool::Fill) {
+                if self.tools.stamping {
+                    self.tools.clipboard = stamp_turn(&self.tools.clipboard, axis);
+                } else {
+                    self.tools.place_rot = tools::turn(self.tools.place_rot, axis);
+                }
+                self.status = format!("Placement rotated 90° about {}", ["X", "Y", "Z"][axis]);
+            } else if !ids.is_empty() {
                 let p = self.pivot();
                 self.model.rotate_quarter(&ids, axis, p);
                 self.status = format!("Rotated 90° about {}", ["X", "Y", "Z"][axis]);
@@ -315,6 +349,10 @@ impl KeelApp {
         }
         if esc {
             self.selected.clear();
+            self.tools.stamping = false;
+            self.tools.fill_start = None;
+            self.tools.measure.clear();
+            self.wiring.pending = None;
             self.tool = Tool::Select;
         }
         if frame {
@@ -329,6 +367,33 @@ impl KeelApp {
         if scale && !ids.is_empty() {
             self.open_scale_dialog();
         }
+    }
+
+    fn copy_selection(&mut self) {
+        let parts: Vec<_> = self.model.components().into_iter().filter(|(id, _)| self.selected.contains(id)).map(|(_, c)| c).collect();
+        let lo = [0, 1, 2].map(|i| parts.iter().map(|c| c.voxel[i]).min().unwrap_or(0));
+        self.tools.clipboard = parts
+            .iter()
+            .map(|c| keel_model::edit::GenPart { def: c.def.clone(), vp: [0, 1, 2].map(|i| c.voxel[i] - lo[i]), r: c.rotation, bc: c.attrs.get("bc").cloned(), ac: c.attrs.get("ac").cloned() })
+            .collect();
+        self.status = format!("Copied {} parts (Ctrl+V to stamp)", self.tools.clipboard.len());
+    }
+
+    /// Parts the Place / Fill tools would add with the cursor at voxel `p`.
+    fn placement(&self, p: [i32; 3]) -> Vec<keel_model::edit::GenPart> {
+        use keel_model::edit::GenPart;
+        let colour = tools::hex(self.tools.colour);
+        let parts = match self.tool {
+            Tool::Place if self.tools.stamping => self.tools.clipboard.iter().map(|c| GenPart { vp: [0, 1, 2].map(|i| c.vp[i] + p[i]), ..c.clone() }).collect(),
+            Tool::Place => vec![GenPart { def: self.place_def.clone(), vp: p, r: self.tools.place_rot, bc: Some(colour), ac: None }],
+            Tool::Fill => match self.tools.fill_start {
+                Some(a) if (0..3).map(|i| (a[i] - p[i]).abs() + 1).product::<i32>() <= 8192 => tools::fill_box(&self.place_def, a, p, self.tools.place_rot, &colour),
+                Some(_) => vec![],
+                None => vec![GenPart { def: self.place_def.clone(), vp: p, r: self.tools.place_rot, bc: Some(colour), ac: None }],
+            },
+            _ => vec![],
+        };
+        tools::with_mirror(parts, self.tools.mirror)
     }
 
     fn open_scale_dialog(&mut self) {
@@ -479,21 +544,27 @@ impl KeelApp {
         ui.horizontal(|ui| {
             theme::pill().show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    if ui.add_enabled(self.model.can_undo(), egui::Button::new("Undo").frame(false)).on_hover_text("Ctrl+Z").clicked() {
+                    if ui.add_enabled_ui(self.model.can_undo(), |ui| icons::button(ui, false, icons::Icon::Undo, "", "Undo (Ctrl+Z)")).inner.clicked() {
                         self.model.undo();
                     }
-                    if ui.add_enabled(self.model.can_redo(), egui::Button::new("Redo").frame(false)).on_hover_text("Ctrl+Y").clicked() {
+                    if ui.add_enabled_ui(self.model.can_redo(), |ui| icons::button(ui, false, icons::Icon::Redo, "", "Redo (Ctrl+Y)")).inner.clicked() {
                         self.model.redo();
                     }
                     ui.separator();
-                    if theme::tool_button(ui, self.tool == Tool::Select, "Select", "Click to select, Shift/Ctrl to add") {
-                        self.tool = Tool::Select;
-                    }
-                    if theme::tool_button(ui, self.tool == Tool::Place, "Place", "Place the catalogue part under the cursor") {
-                        self.tool = Tool::Place;
+                    for (t, icon, name, tip) in Tool::ALL {
+                        if icons::button(ui, self.tool == t, icon, name, tip).clicked() {
+                            self.tool = t;
+                            self.tools.stamping = false;
+                            self.tools.fill_start = None;
+                        }
                     }
                     ui.separator();
-                    if ui.add(egui::Button::new("Frame").frame(false)).on_hover_text("F").clicked() {
+                    if icons::button(ui, self.tools.mirror, icons::Icon::Mirror, "Mirror", "Mirror placing, filling and painting across the centre line (M)").clicked() {
+                        self.tools.mirror = !self.tools.mirror;
+                    }
+                    ui.color_edit_button_srgb(&mut self.tools.colour).on_hover_text("Paint colour (used by Place, Fill and Paint; Alt+click with Paint picks a colour)");
+                    ui.separator();
+                    if icons::button(ui, false, icons::Icon::Frame, "", "Frame the vehicle (F)").clicked() {
                         self.cam.frame(&self.faces);
                     }
                 });
@@ -530,27 +601,34 @@ impl KeelApp {
     }
 
     fn left_panel(&mut self, ui: &mut egui::Ui) {
-        theme::section(ui, "Catalogue");
-        ui.add(egui::TextEdit::singleline(&mut self.search).hint_text("search parts"));
-        ui.label(RichText::new(format!("Placing: {}", self.place_def)).small());
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            let q = self.search.to_lowercase();
-            let mut shown = 0;
-            for (id, d) in &self.catalogue.defs {
-                if !q.is_empty() && !id.to_lowercase().contains(&q) && !d.name.to_lowercase().contains(&q) {
-                    continue;
-                }
-                shown += 1;
-                if shown > 400 {
-                    ui.label("… refine the search");
-                    break;
-                }
-                if ui.selectable_label(self.place_def == *id, format!("{}  ·  {}", d.name, id)).clicked() {
-                    self.place_def = id.clone();
-                    self.tool = Tool::Place;
-                }
+        if self.tool == Tool::Wire {
+            theme::section(ui, "Wiring");
+            ui.checkbox(&mut self.wiring.all, "Show every part's ports");
+            ui.label(RichText::new("Select parts to see their ports, or show them all. Click an output (filled) then an input (ringed); electric and composite ports join either way. Click a wire and press Delete to remove it.").small().color(theme::TEXT_DIM));
+            ui.add_space(4.0);
+            for k in [0, 1, 4, 5, 6, 7] {
+                ui.horizontal(|ui| {
+                    let (r, _) = ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
+                    ui.painter().circle_filled(r.center(), 5.0, wiring::kind_colour(k));
+                    ui.label(wiring::kind_name(k));
+                });
             }
-        });
+            ui.label(RichText::new(format!("{} wires in this vehicle", self.model.links().len())).small().color(theme::TEXT_DIM));
+            ui.separator();
+        }
+        if self.tool == Tool::Measure {
+            theme::section(ui, "Measure");
+            ui.label(RichText::new("Click two points on the vehicle. One block is 0.25 m.").small().color(theme::TEXT_DIM));
+            ui.separator();
+        }
+        theme::section(ui, "Parts");
+        if let Some(d) = self.palette.ui(ui, &self.catalogue, &mut self.meshes, &self.place_def) {
+            self.place_def = d;
+            self.tools.stamping = false;
+            if !matches!(self.tool, Tool::Place | Tool::Fill) {
+                self.tool = Tool::Place;
+            }
+        }
     }
 
     fn right_panel(&mut self, ui: &mut egui::Ui) {
@@ -584,6 +662,33 @@ impl KeelApp {
                     ui.label(format!("{:?}", Model::scale_of(&c.rotation)));
                     ui.end_row();
                 });
+                if let Some(bc) = c.attrs.get("bc") {
+                    ui.horizontal(|ui| {
+                        ui.label("paint");
+                        let rgb = parse_hex(bc);
+                        let (r, _) = ui.allocate_exact_size(egui::vec2(18.0, 18.0), egui::Sense::hover());
+                        ui.painter().rect_filled(r, 4.0, Color32::from_rgb(rgb[0], rgb[1], rgb[2]));
+                        ui.label(RichText::new(bc).monospace());
+                    });
+                }
+                let links = self.wiring.links_of(&self.model, &self.catalogue, *id);
+                if !links.is_empty() {
+                    theme::section(ui, "Wires");
+                    let mut gone = None;
+                    for (l, desc) in &links {
+                        ui.horizontal(|ui| {
+                            let (r, _) = ui.allocate_exact_size(egui::vec2(10.0, 10.0), egui::Sense::hover());
+                            ui.painter().circle_filled(r.center(), 4.0, wiring::kind_colour(l.kind));
+                            ui.label(RichText::new(desc).small());
+                            if ui.small_button("✕").on_hover_text("Remove this wire").clicked() {
+                                gone = Some(l.clone());
+                            }
+                        });
+                    }
+                    if let Some(l) = gone {
+                        self.model.remove_links(&[l]);
+                    }
+                }
                 if let Some(e) = self.model.component_element(*id) {
                     let mut s = String::new();
                     e.write(&mut s);
@@ -722,6 +827,63 @@ impl KeelApp {
     }
 }
 
+impl KeelApp {
+    /// Measure tool: the two picked points, the distance and its components, plus a live rubber band.
+    fn measure_overlay(&mut self, ui: &egui::Ui, view: &viewport::View, cursor: Option<[f32; 3]>) {
+        let painter = ui.painter();
+        let mut pts = self.tools.measure.clone();
+        if pts.len() == 1 {
+            if let Some(c) = cursor {
+                pts.push(c);
+            }
+        }
+        for p in &pts {
+            if let Some((s, _)) = view.project(*p) {
+                painter.circle_filled(s, 4.0, theme::CYAN);
+            }
+        }
+        if let [a, b] = pts[..] {
+            if let (Some((sa, _)), Some((sb, _))) = (view.project(a), view.project(b)) {
+                painter.line_segment([sa, sb], egui::Stroke::new(2.0, theme::CYAN));
+                let d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+                let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
+                let txt = format!("{len:.2} m  ({:.0} blocks)\nΔx {:.2}  Δy {:.2}  Δz {:.2}", len / 0.25, d[0].abs(), d[1].abs(), d[2].abs());
+                let at = sa + (sb - sa) * 0.5 + egui::vec2(10.0, -10.0);
+                let galley = painter.layout_no_wrap(txt, egui::FontId::proportional(13.0), theme::TEXT);
+                let bg = egui::Rect::from_min_size(at - egui::vec2(6.0, galley.size().y + 4.0), galley.size() + egui::vec2(12.0, 8.0));
+                painter.rect_filled(bg, 6.0, theme::PANEL.gamma_multiply(0.95));
+                painter.rect_stroke(bg, 6.0, egui::Stroke::new(1.0, theme::CYAN), egui::StrokeKind::Inside);
+                painter.galley(bg.min + egui::vec2(6.0, 4.0), galley, theme::TEXT);
+            }
+        }
+    }
+}
+
+fn parse_hex(s: &str) -> [u8; 3] {
+    let s = s.trim_start_matches('#');
+    let v = u32::from_str_radix(s.get(..6).unwrap_or(s), 16).unwrap_or(0xFFFFFF);
+    [(v >> 16) as u8, (v >> 8) as u8, v as u8]
+}
+
+/// Rotate a copied stamp a quarter turn about `axis` (positions and orientations), keeping its corner at the origin.
+fn stamp_turn(parts: &[keel_model::edit::GenPart], axis: usize) -> Vec<keel_model::edit::GenPart> {
+    let q = keel_model::edit::quarter_turn(axis);
+    let mut out: Vec<_> = parts
+        .iter()
+        .map(|p| {
+            let vp = [0, 1, 2].map(|i| (0..3).map(|k| q[i][k] * p.vp[k]).sum::<i32>());
+            keel_model::edit::GenPart { vp, r: tools::turn(p.r, axis), ..p.clone() }
+        })
+        .collect();
+    let lo = [0, 1, 2].map(|i| out.iter().map(|p| p.vp[i]).min().unwrap_or(0));
+    for p in &mut out {
+        for i in 0..3 {
+            p.vp[i] -= lo[i];
+        }
+    }
+    out
+}
+
 impl eframe::App for KeelApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
@@ -798,57 +960,121 @@ impl eframe::App for KeelApp {
         }
         egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| {
             let rect = ui.available_rect_before_wrap();
-            // placement ghost under the cursor
+            let view = self.cam.view(rect);
+            let hover = ui.ctx().pointer_hover_pos().filter(|p| rect.contains(*p));
+            let hit = hover.and_then(|h| viewport::pick(&view, &self.faces, h));
+            // the voxel a new part would occupy: against the face under the cursor, or the origin in an empty scene
+            let place_at = match &hit {
+                Some(h) => Some([0, 1, 2].map(|i| ((h.point[i] + h.normal[i] * 0.125) / 0.25).round() as i32)),
+                None if self.faces.is_empty() && hover.is_some() => Some([0, 0, 0]),
+                None => None,
+            };
+            if let Some(h) = &hit {
+                self.place_body = h.comp.body;
+            }
             let mut ghost = None;
-            let mut place_at = None;
-            if self.tool == Tool::Place {
-                if let Some(h) = ui.ctx().pointer_hover_pos().filter(|p| rect.contains(*p)) {
-                    let view = self.cam.view(rect);
-                    let target = match viewport::pick(&view, &self.faces, h) {
-                        Some(hit) => {
-                            self.place_body = hit.comp.body;
-                            let p = [0, 1, 2].map(|i| ((hit.point[i] + hit.normal[i] * 0.125) / 0.25).round() as i32);
-                            Some(p)
-                        }
-                        None if self.faces.is_empty() => Some([0, 0, 0]),
-                        None => None,
-                    };
-                    if let Some(p) = target {
-                        let mut tmp = Model::new_empty();
-                        tmp.add(0, &self.place_def, p, keel_io::vehicle::IDENTITY);
-                        ghost = Some(geometry::build_faces(&tmp, &self.catalogue));
-                        place_at = Some(p);
+            if matches!(self.tool, Tool::Place | Tool::Fill) {
+                if let Some(p) = place_at {
+                    let parts = self.placement(p);
+                    let mut tmp = Model::new_empty();
+                    for g in &parts {
+                        tmp.add(0, &g.def, g.vp, g.r);
                     }
+                    ghost = Some(geometry::build_faces(&tmp, &self.catalogue));
                 }
             }
             let r = viewport::show(ui, &mut self.cam, &self.renderer, ghost.as_deref());
-            if let Some((pos, mods)) = r.clicked {
+            let click = r.clicked;
+            if self.tool == Tool::Wire {
+                if let Some(l) = self.wiring.overlay(ui, &view, &self.model, &self.catalogue, &self.selected, click.map(|c| c.0)) {
+                    self.model.add_link(l);
+                }
+                if !self.wiring.status.is_empty() {
+                    self.status = std::mem::take(&mut self.wiring.status);
+                }
+            }
+            if self.tool == Tool::Measure {
+                self.measure_overlay(ui, &view, hit.as_ref().map(|h| h.point));
+            }
+            if let Some((_, mods)) = click {
                 match self.tool {
-                    Tool::Select => {
-                        let view = self.cam.view(rect);
-                        match viewport::pick(&view, &self.faces, pos) {
-                            Some(hit) => {
-                                if mods.shift || mods.command {
-                                    if !self.selected.remove(&hit.comp) {
-                                        self.selected.insert(hit.comp);
-                                    }
-                                } else {
-                                    self.selected = [hit.comp].into_iter().collect();
+                    Tool::Select => match &hit {
+                        Some(hit) => {
+                            if mods.shift || mods.command {
+                                if !self.selected.remove(&hit.comp) {
+                                    self.selected.insert(hit.comp);
                                 }
+                            } else {
+                                self.selected = [hit.comp].into_iter().collect();
                             }
-                            None if !mods.shift => self.selected.clear(),
-                            None => {}
                         }
-                    }
+                        None if !mods.shift => self.selected.clear(),
+                        None => {}
+                    },
                     Tool::Place => {
                         if let Some(p) = place_at {
+                            let parts = self.placement(p);
                             let body = self.place_body.min(self.model.body_count().saturating_sub(1));
-                            if let Some(id) = self.model.add(body, &self.place_def, p, keel_io::vehicle::IDENTITY) {
-                                self.selected = [id].into_iter().collect();
-                                self.status = format!("Placed {} at {:?}", self.place_def, p);
+                            let (_, a, _) = self.model.apply_build(body, &[], &parts, &[]);
+                            if !self.tools.stamping {
+                                self.palette.used(&self.place_def);
+                            }
+                            self.status = format!("Placed {a} part(s) at {p:?}");
+                        }
+                    }
+                    Tool::Fill => {
+                        if let Some(p) = place_at {
+                            match self.tools.fill_start.take() {
+                                None => {
+                                    self.tools.fill_start = Some(p);
+                                    self.status = format!("Fill from {p:?}: click the opposite corner (Esc cancels)");
+                                }
+                                Some(a) => {
+                                    self.tools.fill_start = Some(a);
+                                    let parts = self.placement(p);
+                                    self.tools.fill_start = None;
+                                    if parts.is_empty() {
+                                        self.status = "Fill box too large (limit 8192 parts)".into();
+                                    } else {
+                                        let body = self.place_body.min(self.model.body_count().saturating_sub(1));
+                                        let (_, n, _) = self.model.apply_build(body, &[], &parts, &[]);
+                                        self.status = format!("Filled {n} parts (one undo step)");
+                                    }
+                                }
                             }
                         }
                     }
+                    Tool::Paint => {
+                        if let Some(h) = &hit {
+                            let comps = self.model.components();
+                            if mods.alt {
+                                if let Some(bc) = comps.iter().find(|(id, _)| *id == h.comp).and_then(|(_, c)| c.attrs.get("bc")) {
+                                    self.tools.colour = parse_hex(bc);
+                                    self.status = format!("Picked colour {bc}");
+                                }
+                            } else {
+                                let mut ids = vec![h.comp];
+                                if self.tools.mirror {
+                                    if let Some((_, c)) = comps.iter().find(|(id, _)| *id == h.comp) {
+                                        let m = [-c.voxel[0], c.voxel[1], c.voxel[2]];
+                                        ids.extend(comps.iter().filter(|(id, o)| id.body == h.comp.body && o.voxel == m && o.def == c.def && *id != h.comp).map(|(id, _)| *id));
+                                    }
+                                }
+                                let hx = tools::hex(self.tools.colour);
+                                self.model.set_paint(&ids, Some(&hx), None);
+                                self.status = format!("Painted {} part(s) {hx}", ids.len());
+                            }
+                        }
+                    }
+                    Tool::Measure => {
+                        if let Some(h) = &hit {
+                            if self.tools.measure.len() >= 2 {
+                                self.tools.measure.clear();
+                            }
+                            self.tools.measure.push(h.point);
+                        }
+                    }
+                    Tool::Wire => {}
                 }
             }
         });
@@ -871,10 +1097,11 @@ struct Args {
     mode: Option<String>,
     bake: bool,
     plan_docked: bool,
+    tool: Option<String>,
 }
 
 fn parse_args() -> Args {
-    let mut a = Args { vehicle: None, defs: None, rom: None, view: None, clean: false, zoom: 1.0, look: None, mode: None, bake: false, plan_docked: false };
+    let mut a = Args { vehicle: None, defs: None, rom: None, view: None, clean: false, zoom: 1.0, look: None, mode: None, bake: false, plan_docked: false, tool: None };
     let mut it = std::env::args().skip(1);
     while let Some(x) = it.next() {
         if x == "--defs" {
@@ -883,6 +1110,8 @@ fn parse_args() -> Args {
             a.plan_docked = true;
         } else if x == "--bake-hull" {
             a.bake = true;
+        } else if x == "--tool" {
+            a.tool = it.next();
         } else if x == "--mode" {
             a.mode = it.next();
         } else if x == "--zoom" {
