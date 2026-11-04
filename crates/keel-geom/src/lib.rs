@@ -4,6 +4,9 @@ pub mod nurbs;
 pub mod voxel;
 pub mod blockhull;
 pub mod facets;
+pub mod lattice;
+pub mod hullblocks;
+pub mod metrics;
 
 /// A hull as a voxelisable solid (sections cached per sample plane).
 pub struct HullSolid<'a> {

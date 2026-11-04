@@ -153,7 +153,7 @@ impl Design {
                 bake = self.bake();
             }
             ui.label(
-                RichText::new("Facet builder: the NURBS surface is quantised to block gradients (1:1, 1:2, 1:4 wedges; 1x1, 1x2, 1x4, 2x2, 2x4, 4x4 pyramid/inverse-pyramid pairs), so faces are planar and meet edge to edge. Standard blocks only, no XML scale edits.")
+                RichText::new("Lattice builder: side and bottom are additive height fields quantised to block gradients; every tile is one wedge or pyramid/inverse-pyramid pair, so faces are planar and continuous. One-voxel shell. Standard blocks only, no XML scale edits.")
                     .small()
                     .color(theme::TEXT_DIM),
             );
@@ -172,8 +172,8 @@ impl Design {
         let hull = self.hull.as_ref()?;
         let t = std::time::Instant::now();
         let o = self.doc.origin;
-        let solid = keel_geom::HullSolid::new(hull);
-        let placed = keel_geom::facets::build(&solid, &keel_geom::facets::FacetOptions { shell: self.doc.shell, origin: o, frame_offset: [0.0, 0.125, 0.0] });
+        let built = keel_geom::hullblocks::build(hull, &keel_geom::hullblocks::HullBlockOptions { origin: o, deck: self.doc.deck });
+        let placed = built.placements;
         let wl = (self.doc.hull.draft / keel_geom::voxel::VOXEL).round() as i32 + o[1];
         let add = placed.iter().map(|p| (p.clone(), if p.vp[1] < wl { self.doc.bottom.clone() } else { self.doc.topside.clone() })).collect::<Vec<_>>();
         let remove = std::mem::replace(&mut self.doc.baked, placed);

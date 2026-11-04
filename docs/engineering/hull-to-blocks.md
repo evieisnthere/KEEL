@@ -1,6 +1,6 @@
 # Hull → blocks: design
 
-Status: **plan, awaiting product-owner review** (2026-11-04). It replaces the ad-hoc voxel-fitting attempts
+Status: **approved direction (2026-11-04): smoothness over fidelity**. Phase P1 in progress. It replaces the ad-hoc voxel-fitting attempts
 (`voxel.rs`, `blockhull.rs`, `facets.rs`). Those stay only as references until this design lands.
 
 ## 1. What "good" means (measurable)
@@ -11,7 +11,7 @@ A generated hull must be:
 |---|---|---|
 | Q1 | **Watertight**: no holes in the skin or the deck | every exposed face of the block shell is backed by a solid. Hole count = 0 |
 | Q2 | **No shingles on smooth surfaces**: where the NURBS curves gently, adjacent sections produce one continuous planar face, not 1-voxel jumps | area of exposed *step faces*, i.e. faces whose normal is > 25° off the local NURBS normal, as a share of hull area. Target < 3 % outside the bow and stern zones |
-| Q3 | **Faithful**: follows the NURBS | max and RMS distance from the block surface to the NURBS, in voxels. Target max ≤ 0.6, RMS ≤ 0.25 |
+| Q3 | **Close enough**: follows the NURBS, but smoothness wins (product-owner decision) | max and RMS distance in voxels, reported. Soft target: max ≤ 1.5, RMS ≤ 0.6 |
 | Q4 | **Planar facets meet edge to edge**: no T-gaps or slivers | every facet edge is shared by exactly two facets or lies on the hull boundary |
 | Q5 | **Standard blocks only**, placeable in the editor | definitions 01–16, proper or mirrored rotations. Mirrored rotations are what the editor's symmetry tool produces, and the game's own default rotation is a mirror |
 | Q6 | **Real deck** following the sheer | deck plating present in every hull column; the sheer is built from 1:4 / 1:2 ramps |
@@ -61,6 +61,26 @@ Neighbouring facets with different gradients have different box grids. Where the
 lattice lines shared by both grids. This is the real difficulty, and the reason per-voxel or per-box greedy choices
 produced spikes, gaps and shingles.
 
+## 2.3 The additive-tile construction (chosen)
+
+If a region's height field is **additive**, H(u, v) = A(u) + B(v), every tile is planar and shares its corners with its
+neighbours exactly, so the surface is continuous everywhere. Quantise A and B each as a 1D lattice path of steps
+(run L ∈ {1, 2, 4}, rise ∈ {−1, 0, +1}; flat steps have run 1). Then every tile, step of A × step of B, is exactly
+one box column:
+
+* **Both steps rise:** gradients (1/L_u, 1/L_v). The tile is a box (1, L_u, L_v), which is always one of the six
+  pyramid families. Its plane spans two height layers: an inverse pyramid in the lower layer and a pyramid in the upper.
+* **One step rises:** a wedge 1×L.
+* **Both flat:** a flat face.
+
+All nine combinations of runs (1, 2, 4) × (1, 2, 4) are in the block set. Tiles need no fill heuristics: the solid part
+of each box is the box corners on the solid side of the plane, matched exactly to a block. Terracing can only appear
+where two regions meet (chine, sheer, stem), never inside a region.
+
+Fidelity cost: within a region the section shape is shared along the length and the plan shape across the height. That
+is the accepted trade (smoothness over fidelity). Regions are chosen so the model fits: midbody side, forebody side,
+bottom, deck.
+
 ## 3. Algorithm
 
 The hull is symmetric. Build the starboard half and mirror it.
@@ -74,7 +94,12 @@ The hull is symmetric. Build the starboard half and mirror it.
 
    Use hysteresis so regions are large and contiguous. Each region becomes a height field over a 2D lattice.
 2. **Gradient field.** Sample f and ∇f at lattice-cell centres (voxel units) from the analytic NURBS sections.
-3. **Coherent gradient quantisation.** Assign each cell a gradient from the §2.1 table. The objective has three parts:
+3. **Additive fit and path quantisation** (§2.3). Fit A(u) and B(v) by least squares over the region's samples.
+   Quantise each with a dynamic programme over lattice heights. The cost is squared error plus a penalty per change of
+   step type, so long constant runs are preferred. (The general ICM approach below is kept for later, non-additive
+   regions.)
+
+   *General approach:* **Coherent gradient quantisation.** Assign each cell a gradient from the §2.1 table. The objective has three parts:
    * a data term: distance from the true gradient;
    * a smoothness term: a penalty for neighbouring cells with different gradients;
    * an alignment term: a patch's extent along u and v must be a multiple of its box size, so it tiles.
@@ -122,6 +147,25 @@ The hull is symmetric. Build the starboard half and mirror it.
 | P2 | BOTTOM and DECK regions, chine and sheer seams | default hull Q1/Q2/Q6 pass midships |
 | P3 | STEM and TRANSOM regions, bow and stern seams | default hull and all presets pass Q1–Q4 |
 | P4 | UI: bake options, metric readout, colour zones (boot-top), performance (< 2 s for a 30 m hull) | product-owner review of the render set |
+
+### P1 status (2026-11-04)
+
+Implemented in `crates/keel-geom/src/{lattice,hullblocks,metrics}.rs`:
+
+* SIDE (A(z) + B(y)) and BOTTOM (C(z) + D(x)) regions, mirrored to port. The centre column uses cubes and fore-aft
+  wedges only.
+* The chine is joined by constraining D to end at the side's chine point at midships (`PathOptions::end_h`), so the
+  midship section is one continuous lattice polyline.
+* **Closure.** The quantised model solid (bottom, side, deck) defines the hull. Every model-boundary voxel that no
+  tile covers becomes a cube. This closes the deck, the transom, the stem and the remaining seams.
+* **Metrics** (`metrics::measure`). The exact block solids are rasterised at 4 samples per voxel and the outside is
+  flood-filled. Q1 leaks are interior samples reached from outside. Q2 steps are exposed faces more than 25° off the
+  NURBS normal. Debugging aids: `KEEL_METRICS_SLICE=<z voxel>` prints an ASCII section and `KEEL_METRICS_TRACE=1`
+  prints a leak path.
+
+Default 20 m hull: **0 leaks; mid-zone step faces 5.2 %** (target < 3 %). The remaining steps are on the forebody chine
+(z 5–7 m), where the bottom rises and the plan narrows at the same time. The bow and stern zones are 51 % steps, because
+the closure cubes terrace the forefoot. These are the P2/P3 seam and stem work.
 
 ## 6. Open questions
 
