@@ -192,10 +192,11 @@ pub fn block_points(bt: i32) -> Option<Vec<[f64; 3]>> {
         [x_lo, x_hi].iter().flat_map(|&x| [-H, H].into_iter().flat_map(move |y| [z_lo, z_hi].into_iter().map(move |z| [x, y, z]))).collect();
     // the corner the slopes fall away from is at +x for every pyramid: that is where the definitions put the
     // triangular side surfaces (the collision hulls in 0x14031ab90 are built mirrored in x)
-    let (cx, fx) = match std::env::var("KEEL_DEBUG_CORNER").as_deref() {
-        Ok("lo") => (x_lo, x_hi),
-        Ok("narrow_lo") if !wide => (x_lo, x_hi),
-        Ok("wide_lo") if wide => (x_lo, x_hi),
+    let only = std::env::var("KEEL_DEBUG_CORNER_BT").ok().map(|v| v.split(',').any(|b| b.parse::<i32>().ok() == Some(bt))).unwrap_or(true);
+    let (cx, fx) = match std::env::var("KEEL_DEBUG_CORNER").as_deref().ok().filter(|_| only) {
+        Some("lo") => (x_lo, x_hi),
+        Some("narrow_lo") if !wide => (x_lo, x_hi),
+        Some("wide_lo") if wide => (x_lo, x_hi),
         _ => (x_hi, x_lo),
     };
     let pts = match family {
@@ -300,12 +301,28 @@ struct Piece {
     surface: Option<usize>,
 }
 
+/// Diagnostic: slope pieces and the surface (index, orientation, shape) each was matched to.
+pub fn slope_assignments(d: &Definition) -> Vec<([f64; 3], Option<(usize, u8, u8, [i32; 3])>)> {
+    block_pieces(d)
+        .into_iter()
+        .filter(|p| !p.normal.iter().any(|x| x.abs() > 0.999))
+        .map(|p| (p.normal, p.surface.map(|i| (i, d.surfaces[i].orientation, d.surfaces[i].shape, d.surfaces[i].position))))
+        .collect()
+}
+
 /// Diagnostic: (pieces, pieces matched to a definition surface, definition surfaces left unused).
 pub fn block_piece_stats(d: &Definition) -> (usize, usize, usize) {
     let p = block_pieces(d);
     let used: std::collections::HashSet<usize> = p.iter().filter_map(|x| x.surface).collect();
     let real = d.surfaces.iter().filter(|s| s.shape != 0).count();
     (p.len(), p.iter().filter(|x| x.surface.is_some()).count(), real - used.len().min(real))
+}
+
+/// Surface shape ids that are sloped faces: 6/7/8 in the game's buoyancy table (wedge, pyramid, inverse pyramid) and
+/// the render-only partial slopes from 21 upward. Flat faces are 1/2/4/5 and the partial side pieces 9-20.
+/// Slopes and flat faces can share an orientation code, so they must be told apart by shape.
+pub fn is_slope_shape(shape: u8) -> bool {
+    matches!(shape, 6..=8) || shape >= 21
 }
 
 fn block_pieces(d: &Definition) -> Vec<Piece> {
@@ -337,7 +354,7 @@ fn block_pieces(d: &Definition) -> Vec<Piece> {
                 .surfaces
                 .iter()
                 .enumerate()
-                .filter(|(i, s)| s.position == v && s.shape != 0 && (s.orientation as usize) < 6 && (pass == 0 || !used.contains(i)))
+                .filter(|(i, s)| s.position == v && s.shape != 0 && (s.orientation as usize) < 6 && is_slope_shape(s.shape) == (pass == 1) && !used.contains(i))
                 .map(|(i, s)| (i, dot(pc.normal, DIRS[s.orientation as usize])))
                 .filter(|(_, k)| if pass == 0 { *k > 0.999 } else { *k > 0.05 })
                 .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
@@ -458,7 +475,20 @@ pub fn build_faces_with(model: &Model, cat: &Catalogue, meshes: &mut MeshLibrary
     for (id, c) in model.components() {
         let m = mat(&c.rotation);
         let origin = [c.voxel[0] as f64 * 0.25, c.voxel[1] as f64 * 0.25, c.voxel[2] as f64 * 0.25];
-        let paint = Paint::from_info(&c);
+        let mut paint = Paint::from_info(&c);
+        if std::env::var_os("KEEL_DEBUG_FLAT").is_some() {
+            paint = Paint { bc: Some([200, 200, 200]), ..Default::default() };
+        }
+        if std::env::var_os("KEEL_DEBUG_TINT").is_some() {
+            // debug: colour by (definition, rotation) to identify parts in screenshots
+            let mut h: u32 = 2166136261;
+            for b in c.def.bytes().chain(c.rotation.iter().flat_map(|x| x.to_le_bytes())) {
+                h = (h ^ b as u32).wrapping_mul(16777619);
+            }
+            let col = [60 + (h & 0xbf) as u8, 60 + ((h >> 8) & 0xbf) as u8, 60 + ((h >> 16) & 0xbf) as u8];
+            paint = Paint { bc: Some(col), ..Default::default() };
+            if let Ok(path) = std::env::var("KEEL_DEBUG_TINT") { use std::io::Write; if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) { let _ = writeln!(f, "{:02X}{:02X}{:02X} {} {:?}", col[0], col[1], col[2], c.def, c.rotation); } }
+        }
         let place = |p: [f64; 3]| {
             let w = apply(&m, p);
             [origin[0] + w[0], origin[1] + w[1], origin[2] + w[2]]
