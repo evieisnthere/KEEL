@@ -114,7 +114,8 @@ pub fn templates() -> &'static Vec<Template> {
 /// Tile the shell (starboard half; labels are mirror-symmetric, so x is taken as |x|). `label(e)` is the model's inside
 /// test at lattice corner e (eighth-metre units). `shell` lists the voxels with a corner inside. `cube_veto(v)` can
 /// leave out shell cubes (open hull). `allowed(template, anchor)` can veto placements (e.g. pyramids in the centre
-/// column). Returns placements with the voxels each covers.
+/// column). `align(cells)` scores how well a footprint sits on the model's tile grid (0..1), used to break ties between
+/// equally large candidates. Returns placements with the voxels each covers.
 ///
 /// 1. Exact pass: every block whose labels match the model, largest first.
 /// 2. Builder pass: a long block (≥ 4 voxels) that disagrees with the model on at most two corners is placed anyway,
@@ -127,6 +128,7 @@ pub fn tile(
     shell: &[[i32; 3]],
     cube_veto: &dyn Fn([i32; 3]) -> bool,
     allowed: &dyn Fn(&Template, [i32; 3]) -> bool,
+    align: &dyn Fn(&[[i32; 3]]) -> f64,
 ) -> Vec<(Placement, Vec<[i32; 3]>)> {
     let key = |e: [i32; 3]| [e[0].abs(), e[1], e[2]];
     let mut lab: HashMap<[i32; 3], bool> = HashMap::new();
@@ -164,7 +166,10 @@ pub fn tile(
                     }
                     let mism = t.corners.iter().filter(|(q, ins)| get(&mut lab, [q[0] + 2 * anchor[0], q[1] + 2 * anchor[1], q[2] + 2 * anchor[2]]) != *ins).count();
                     if mism == 0 && pass == 0 {
-                        cands.push((t.cells.len() as f64 + 0.01 * t.volume, ti, anchor));
+                        // bigger first; among equal sizes, footprints on the model's own tile grid first (a plane with
+                        // equal gradients fits many shifted boxes, and mixing shifts leaves gaps)
+                        let cells: Vec<[i32; 3]> = t.cells.iter().map(|c| [c[0] + anchor[0], c[1] + anchor[1], c[2] + anchor[2]]).collect();
+                        cands.push((t.cells.len() as f64 + 0.5 * align(&cells) + 0.01 * t.volume, ti, anchor));
                     } else if pass == 1 && mism <= 2 {
                         cands.push((t.cells.len() as f64 - 1.5 * mism as f64 + 0.01 * t.volume, ti, anchor));
                     }

@@ -34,7 +34,7 @@ pub struct CurveOptions {
 
 impl Default for CurveOptions {
     fn default() -> Self {
-        CurveOptions { change: 0.4, reverse: 3.0, allowed: vec![0, 1, 2, 3, 4, 6] }
+        CurveOptions { change: 0.4, reverse: 3.0, allowed: vec![0, 1, 2, 3, 6] }
     }
 }
 

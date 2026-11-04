@@ -190,8 +190,19 @@ blocks wide, then 1×2 slopes, 1×1 slopes, 1×2 and 1×4 slopes to define the c
   * `scripts/hullshot.py` (depth-buffered flat-colour renders; `--bytype` colours cubes, 1-voxel blocks and long blocks);
   * the `curves`, `modelcheck`, `steps`, `maskat` and `blocksat` examples.
 
-Remaining: a few 1-voxel pieces where the rising keel meets the side near the stem, and orange 1-voxel blocks at the deck
-edge where the sheer ramps cross the plan curve.
+Refinements:
+* **Forefoot from the side sweep.** The forward keel line is flat; the forefoot and stem come from the side's 45° curl
+  reaching the centre line higher as the deck curve narrows. A separate rising keel line cut diagonally through the side's
+  4-row tiles, and a ¼-gradient plane can only be tiled by 4-long blocks. `KEEL_FOREFOOT=1` restores the fitted profile.
+* **Plan steps.** Up to 1×1 plus the flat front. A 2×1 segment swept by a 1-in-4 flare is not tileable.
+* **Flare above the midship deck** is held constant, so the stem does not widen into a T where the sheer rises.
+* **Tile-grid alignment.** A plane with equal gradients fits many diagonally shifted boxes, and mixing them leaves gaps.
+  Candidates whose footprint sits between the model's own break lines win ties: plan points and flare breaks for side
+  tiles, keel points and deadrise breaks for bottom tiles.
+
+Status, default hull: 0 leaks. Bow topsides are 4×4 / 2×4 / 1×4 pyramid pairs, 45° chamfers near the stem and a flat
+stem bar. Remaining: a few 1-voxel pieces where the transom lift raises the aft keel, and a few small marks on the bottom
+near the bow where the curl's crease crosses a ¼ deadrise.
 
 ## 6. Open questions
 

@@ -9,5 +9,7 @@ fn main() {
     println!("{}", b.model.describe());
     println!("plan fwd pts {:?}", b.model.plan_fwd.pts);
     println!("flare (from row {}) {:?}", b.model.flare_lo, b.model.flare.iter().map(|s| (s.start, s.run, s.h0, s.rise)).collect::<Vec<_>>());
+    println!("deadrise {:?}", b.model.deadrise.iter().map(|s| (s.start, s.run, s.h0, s.rise)).collect::<Vec<_>>());
+    println!("sheer {:?}", b.model.sheer.iter().filter(|s| s.rise != 0).map(|s| (s.start, s.run, s.h0, s.rise)).collect::<Vec<_>>());
     println!("keel fwd pts {:?}", b.model.keel_fwd.pts);
 }
