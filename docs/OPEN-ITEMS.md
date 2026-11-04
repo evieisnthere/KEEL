@@ -21,7 +21,8 @@ is closed, delete it here and update the RE document.
 | A9 | Rudder `body[+8]` read as mass (it could be inverse mass); the keel righting couple's argument is inferred to be vehicle mass | turning rate | RE-0012 | GAME (test-pack R3) |
 | A10 | Electrical: what the 300-tick ramp counter measures; per-component draw constants for lights, displays, radars and seats; solar coefficients | battery life | RE-0011 §4 | RE |
 | A11 | Logic between physical components (outside microcontrollers) is assumed to take one tick per link | control-loop timing | RE-0013 §4 | GAME (test-pack L1) |
-| A12 | Microcontroller details: bridge type numbering is inferred; SR latch edge cases; the full expression grammar (operator precedence, boolean operators); Lua Script needs an embedded Lua VM | MC simulation | RE-0013 | RE + APP |
+| A12 | Microcontroller details: bridge type numbering is inferred (consistent with node types over 7616 corpus MCs); SR latch edge cases; the full expression grammar (operator precedence; boolean `!&` `!|` `!^` read as NAND/NOR/XNOR; `round(x, step)` read as rounding to a multiple of step, both seen in vehicles but unconfirmed); composite read/write `i` taken as a 0-based channel; Lua Script, video and audio are not simulated (Lua needs an embedded VM) | MC simulation | RE-0013, `crates/keel-mc` | RE + APP |
+| A12b | Microcontroller IO ports are placed at footprint cell (x, 0, z) of the part. Corpus evidence: dangling-wire warnings on a sample vehicle fell from 218 to 19 once MC ports were added; the rest are not explained yet | wire diagnostics | `keel-model` diagnostics | RE |
 | A13 | Not yet decoded at all: water jets, electric-motor torque slots on non-motor parts, jet engines, steam, wheels/tracks, winches/ropes, gyros, radar/sonar sensing models | anything using them | — | RE (when a feature needs it) |
 
 ## B. File format gaps (affect export)
@@ -43,6 +44,13 @@ the steady top speed and the mass the editor shows. KEEL then sets the thrust fa
 This also exercises the round trip (B2).
 
 ## D. Application (Phase 1 onward, see PROJECT_PLAN.md)
+Known limits of alpha 0.0.1:
+- The microcontroller part is drawn as one voxel whatever its footprint; its ports are placed correctly.
+- Nested microcontroller groups are preserved but not shown (none in the corpus).
+- Generated ships longer than ~58 m or wider than ~23.5 m exceed the game's size limit; KEEL warns but still generates.
+- Power predictions carry an uncalibrated thrust factor (A6b) until test C1 is reported.
+- No macOS build yet (Linux and Windows only).
+
 - Geometry-kernel spike: truck vs opencascade-rs (ADR-0001).
 - Rust ports of the reference models, golden-tested against `sim-reference/`.
 - The UI: viewer → block editor → systems editor → simulation → export (plan phases 1–6).

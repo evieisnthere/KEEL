@@ -1,4 +1,5 @@
-//! KEEL desktop application (Phase 1: native vehicle foundation).
+#![cfg_attr(windows, windows_subsystem = "windows")]
+//! KEEL desktop application.
 //!
 //! Usage: `keel [vehicle.xml] [--defs <rom/data/definitions>]`. The definitions folder is remembered in the settings file.
 mod design;
@@ -527,9 +528,14 @@ impl KeelApp {
                 }
             });
             ui.menu_button("Help", |ui| {
-                ui.label("LMB orbit / select · RMB pan · wheel zoom");
-                ui.label("R rotate · S scale · arrows / PgUp / PgDn move");
-                ui.label("Del delete · Ctrl+D duplicate · Ctrl+Z / Y undo / redo · F frame");
+                ui.label(RichText::new(format!("KEEL {}", env!("CARGO_PKG_VERSION"))).strong());
+                ui.label(RichText::new("Stormworks Engineering Suite. Not affiliated with Geometa.").small().color(theme::TEXT_DIM));
+                ui.separator();
+                ui.label("Left-drag orbit · right-drag pan · wheel zoom · F frame");
+                ui.label("Click select (Shift adds) · arrows / PgUp / PgDn move · R rotate");
+                ui.label("S scale · Del delete · Ctrl+D duplicate · Ctrl+C / Ctrl+V stamp");
+                ui.label("M mirror · Alt+click with Paint picks a colour · Esc cancels");
+                ui.label("Ctrl+Z / Ctrl+Y undo / redo · Ctrl+S save");
             });
         });
     }
@@ -1231,7 +1237,7 @@ fn parse_args() -> Args {
                 (p.len() == 2).then(|| [p[0].to_radians(), p[1].to_radians()])
             });
         } else if x == "--help" || x == "-h" {
-            println!("keel [vehicle.xml] [--defs <rom/data/definitions>] [--rom <rom folder with meshes/>] [--view yaw,pitch]");
+            println!("keel {} [vehicle.xml] [--defs <rom/data/definitions>] [--rom <rom folder with meshes/>] [--mode build|hull|decks|power|logic] [--tool select|place|paint|fill|measure|wire] [--view yaw,pitch]", env!("CARGO_PKG_VERSION"));
             std::process::exit(0);
         } else {
             a.vehicle = Some(PathBuf::from(x));

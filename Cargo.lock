@@ -1033,7 +1033,7 @@ dependencies = [
 
 [[package]]
 name = "keel-app"
-version = "0.1.0"
+version = "0.0.1-alpha"
 dependencies = [
  "eframe",
  "keel-geom",
@@ -1049,7 +1049,7 @@ dependencies = [
 
 [[package]]
 name = "keel-geom"
-version = "0.1.0"
+version = "0.0.1-alpha"
 dependencies = [
  "keel-io",
  "keel-model",
@@ -1059,11 +1059,11 @@ dependencies = [
 
 [[package]]
 name = "keel-io"
-version = "0.1.0"
+version = "0.0.1-alpha"
 
 [[package]]
 name = "keel-layout"
-version = "0.1.0"
+version = "0.0.1-alpha"
 dependencies = [
  "keel-geom",
  "keel-io",
@@ -1074,14 +1074,14 @@ dependencies = [
 
 [[package]]
 name = "keel-mc"
-version = "0.1.0"
+version = "0.0.1-alpha"
 dependencies = [
  "keel-io",
 ]
 
 [[package]]
 name = "keel-model"
-version = "0.1.0"
+version = "0.0.1-alpha"
 dependencies = [
  "keel-io",
  "serde_json",
@@ -1089,7 +1089,7 @@ dependencies = [
 
 [[package]]
 name = "keel-power"
-version = "0.1.0"
+version = "0.0.1-alpha"
 dependencies = [
  "serde",
 ]

@@ -238,7 +238,7 @@ fn call(f: &str, a: &[f64]) -> Result<f64, String> {
     let need = |n: usize| if a.len() == n { Ok(()) } else { Err(format!("{f} takes {n} argument(s)")) };
     Ok(match f {
         "abs" => (need(1)?, a[0].abs()).1,
-        // round(x, step) appears in vehicles; KEEL rounds to a multiple of step (unconfirmed, OPEN-ITEMS A8)
+        // round(x, step) appears in vehicles; KEEL rounds to a multiple of step (unconfirmed, OPEN-ITEMS A12)
         "round" if a.len() == 2 && a[1] != 0.0 => (a[0] / a[1]).round() * a[1],
         "round" => (need(1)?, a[0].round()).1,
         "floor" => (need(1)?, a[0].floor()).1,

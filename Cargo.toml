@@ -5,4 +5,4 @@ members = ["crates/keel-app", "crates/keel-geom", "crates/keel-io", "crates/keel
 [workspace.package]
 edition = "2021"
 license = "UNLICENSED"
-version = "0.1.0"
+version = "0.0.1-alpha"
