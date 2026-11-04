@@ -198,6 +198,7 @@ impl KeelApp {
             }
             if self.bake_on_start {
                 self.bake_on_start = false;
+                self.design.show_preview = false;
                 self.design.refresh();
                 if let Some(b) = self.design.bake_now() {
                     self.apply_bake(b);

@@ -2,6 +2,7 @@
 pub mod hull;
 pub mod nurbs;
 pub mod voxel;
+pub mod blockhull;
 
 /// A hull as a voxelisable solid (sections cached per sample plane).
 pub struct HullSolid<'a> {
@@ -29,6 +30,31 @@ impl voxel::Solid for HullSolid<'_> {
             Some(b) => q[0].abs() <= b,
             None => false,
         }
+    }
+    fn normal(&self, q: [f64; 3]) -> Option<[f64; 3]> {
+        let p = &self.hull.params;
+        let s = q[2] / p.length + 0.5;
+        if !(0.0..=1.0).contains(&s) {
+            return None;
+        }
+        // near the deck edge (sheer) the surface is the horizontal deck plane
+        if q[1] > p.sheer(s) - 0.125 {
+            return Some([0.0, 1.0, 0.0]);
+        }
+        let b = |y: f64, z: f64| -> Option<f64> {
+            let sec = self.hull.section_at(z, 48)?;
+            let y = y.clamp(sec[0][1], sec[sec.len() - 1][1]);
+            hull::Hull::half_breadth(&sec, y)
+        };
+        let (h, y, z) = (0.06, q[1], q[2]);
+        let by = (b(y + h, z)? - b(y - h, z)?) / (2.0 * h);
+        let bz = (b(y, z + h).unwrap_or(0.0) - b(y, z - h).unwrap_or(0.0)) / (2.0 * h);
+        // starboard surface x = b(y, z): outward normal ∝ (1, -b_y, -b_z); mirror for port
+        let sx = if q[0] < 0.0 { -1.0 } else { 1.0 };
+        let n = [sx, -by, -bz];
+        let l = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
+        // at the keel line (x ≈ 0) the bottom is the surface: use the section bottom slope
+        Some([n[0] / l, n[1] / l, n[2] / l])
     }
 }
 

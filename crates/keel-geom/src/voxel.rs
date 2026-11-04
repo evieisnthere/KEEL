@@ -53,6 +53,41 @@ fn sample_offsets() -> Vec<[f64; 3]> {
 
 type Bits = u64;
 
+/// Slope normal of each single-voxel shape in local coordinates (outward, unit).
+fn local_slope(def: &str) -> [f64; 3] {
+    let k2 = std::f64::consts::FRAC_1_SQRT_2;
+    let k3 = 1.0 / 3f64.sqrt();
+    match def {
+        "02_wedge" => [0.0, k2, -k2],
+        // pyramid: right-angle corner at (+x, -y, +z), slope faces away from it
+        "03_pyramid" => [-k3, k3, -k3],
+        _ => [-k3, k3, -k3], // inverse pyramid: missing corner at (-x, +y, -z)
+    }
+}
+
+/// Rotation of a single-voxel slope block (`02_wedge`, `03_pyramid`, `04_invpyramid`) whose slope normal best matches `n`.
+pub fn oriented_block(def: &str, n: [f64; 3]) -> [i32; 9] {
+    let ln = local_slope(def);
+    *rotations()
+        .iter()
+        .max_by(|a, b| {
+            let da = rotate_f(a, ln);
+            let db = rotate_f(b, ln);
+            (da[0] * n[0] + da[1] * n[1] + da[2] * n[2]).partial_cmp(&(db[0] * n[0] + db[1] * n[1] + db[2] * n[2])).unwrap()
+        })
+        .unwrap()
+}
+
+/// Fraction of a voxel (centre `c`, metres) inside the solid, from 4x4x4 samples.
+pub fn fill_fraction(solid: &dyn Solid, c: [f64; 3]) -> f64 {
+    let offs = sample_offsets();
+    offs.iter().filter(|o| solid.inside([c[0] + o[0], c[1] + o[1], c[2] + o[2]])).count() as f64 / offs.len() as f64
+}
+
+fn rotate_f(r: &[i32; 9], v: [f64; 3]) -> [f64; 3] {
+    [0, 1, 2].map(|i| r[i] as f64 * v[0] + r[3 + i] as f64 * v[1] + r[6 + i] as f64 * v[2])
+}
+
 /// Occupancy patterns of every single-voxel block shape in every rotation.
 fn library() -> &'static Vec<(Bits, &'static str, [i32; 9])> {
     static L: OnceLock<Vec<(Bits, &'static str, [i32; 9])>> = OnceLock::new();
@@ -87,6 +122,10 @@ fn library() -> &'static Vec<(Bits, &'static str, [i32; 9])> {
 pub trait Solid {
     fn bounds(&self) -> ([f64; 3], [f64; 3]);
     fn inside(&self, p: [f64; 3]) -> bool;
+    /// Exact outward surface normal near p, if the solid knows it (falls back to the voxel fill gradient).
+    fn normal(&self, _p: [f64; 3]) -> Option<[f64; 3]> {
+        None
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -170,7 +209,27 @@ pub fn voxelise(solid: &dyn Solid, opt: &Options) -> Vec<Placement> {
     let mut out = Vec::new();
     let mut keys: Vec<_> = cells.keys().copied().collect();
     keys.sort();
+    // pass 1: long wedges on shallow slopes
+    let mut consumed: HashSet<[i32; 3]> = HashSet::new();
+    for k in &keys {
+        let bits = cells[k];
+        if bits == full || consumed.contains(k) {
+            continue;
+        }
+        if let Some(keep) = &keep {
+            if bits.count_ones() as usize * 2 > N * N * N && !keep.contains(k) {
+                continue;
+            }
+        }
+        if let Some((p, cov)) = long_wedge(*k, &cells, &consumed, full, solid) {
+            consumed.extend(cov);
+            out.push(p);
+        }
+    }
     for k in keys {
+        if consumed.contains(&k) {
+            continue;
+        }
         let bits = cells[&k];
         if opt.open_top && top_y.get(&(k[0], k[2])) == Some(&k[1]) && bits != full {
             continue;
@@ -181,23 +240,135 @@ pub fn voxelise(solid: &dyn Solid, opt: &Options) -> Vec<Placement> {
                 continue;
             }
         }
-        // best fit among empty, cube and the shape library
-        let mut best: (u32, Option<(&str, [i32; 9])>) = (ones as u32, None);
-        let cube = (full ^ bits).count_ones();
-        if cube < best.0 {
-            best = (cube, Some(("01_block", keel_io::vehicle::IDENTITY)));
-        }
-        for (b, def, r) in lib {
-            let d = (b ^ bits).count_ones();
-            if d < best.0 {
-                best = (d, Some((def, *r)));
-            }
-        }
-        if let Some((def, r)) = best.1 {
+        if let Some((def, r)) = choose(k, bits, &cells, lib, full, solid) {
             out.push(Placement { def: def.to_string(), vp: k, r });
         }
     }
     out
+}
+
+fn fill(cells: &HashMap<[i32; 3], Bits>, k: [i32; 3]) -> f64 {
+    cells.get(&k).map(|b| b.count_ones() as f64 / (N * N * N) as f64).unwrap_or(0.0)
+}
+
+fn surface_normal(solid: &dyn Solid, cells: &HashMap<[i32; 3], Bits>, k: [i32; 3]) -> Option<[f64; 3]> {
+    solid.normal([k[0] as f64 * VOXEL, k[1] as f64 * VOXEL, k[2] as f64 * VOXEL]).or_else(|| normal_at(cells, k))
+}
+
+fn normal_at(cells: &HashMap<[i32; 3], Bits>, k: [i32; 3]) -> Option<[f64; 3]> {
+    let mut g = [0.0f64; 3];
+    for dx in -1..=1 {
+        for dy in -1..=1 {
+            for dz in -1..=1 {
+                let w = fill(cells, [k[0] + dx, k[1] + dy, k[2] + dz]);
+                g[0] += w * dx as f64;
+                g[1] += w * dy as f64;
+                g[2] += w * dz as f64;
+            }
+        }
+    }
+    let len = (g[0] * g[0] + g[1] * g[1] + g[2] * g[2]).sqrt();
+    (len > 1e-9).then(|| [-g[0] / len, -g[1] / len, -g[2] / len])
+}
+
+/// Try to cover a shallow edge slope with a 1x2 or 1x4 wedge anchored so that the covered voxels' fills match.
+/// Returns the placement and the voxels it covers.
+fn long_wedge(k: [i32; 3], cells: &HashMap<[i32; 3], Bits>, consumed: &HashSet<[i32; 3]>, full: Bits, solid: &dyn Solid) -> Option<(Placement, Vec<[i32; 3]>)> {
+    let n = surface_normal(solid, cells, k)?;
+    let mut a: Vec<f64> = n.iter().map(|x| x.abs()).collect();
+    a.sort_by(|x, y| y.partial_cmp(x).unwrap());
+    if a[2] > 0.2 || a[1] < 0.12 {
+        return None; // not a clean edge slope, or practically flat
+    }
+    let ratio = a[1] / a[0];
+    let (len, def) = if ratio < 0.36 { (4, "08_wedge_4") } else if ratio < 0.7 { (2, "05_wedge_2") } else { return None };
+    let ln = {
+        let v = [0.0, len as f64, -1.0];
+        let l = (v[1] * v[1] + 1.0f64).sqrt();
+        [0.0, v[1] / l, v[2] / l]
+    };
+    let r = *rotations().iter().max_by(|x, y| {
+        let dx = rotate_f(x, ln);
+        let dy = rotate_f(y, ln);
+        (dx[0] * n[0] + dx[1] * n[1] + dx[2] * n[2]).partial_cmp(&(dy[0] * n[0] + dy[1] * n[1] + dy[2] * n[2])).unwrap()
+    })?;
+    let d = [-r[6], -r[7], -r[8]]; // world direction of local -z (the run)
+    let expected: Vec<f64> = (0..len).map(|i| (2 * len - 1 - 2 * i) as f64 / (2 * len) as f64).collect();
+    let mut best: Option<(f64, [i32; 3])> = None;
+    for j in 0..len {
+        let anchor = [k[0] - j * d[0], k[1] - j * d[1], k[2] - j * d[2]];
+        let mut err = 0.0;
+        let mut ok = true;
+        for (i, e) in expected.iter().enumerate() {
+            let v = [anchor[0] + i as i32 * d[0], anchor[1] + i as i32 * d[1], anchor[2] + i as i32 * d[2]];
+            match cells.get(&v) {
+                Some(b) if *b != full && !consumed.contains(&v) => err += (fill(cells, v) - e).abs(),
+                _ => {
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        if ok && best.is_none_or(|b| err < b.0) {
+            best = Some((err, anchor));
+        }
+    }
+    let (err, anchor) = best?;
+    if err / len as f64 > 0.14 {
+        return None;
+    }
+    let covered = (0..len).map(|i| [anchor[0] + i * d[0], anchor[1] + i * d[1], anchor[2] + i * d[2]]).collect();
+    Some((Placement { def: def.to_string(), vp: anchor, r }, covered))
+}
+
+/// Surface-aligned block choice. The outward normal comes from the fill gradient over the 3x3x3 neighbourhood.
+/// Axis-aligned surfaces become cubes, edge slopes become wedges oriented to the normal, and corners become pyramids or
+/// inverse pyramids. Neighbours on one smooth surface therefore pick the same shape and orientation, which avoids the
+/// spiky "best occupancy match" look.
+fn choose(k: [i32; 3], bits: Bits, cells: &HashMap<[i32; 3], Bits>, lib: &[(Bits, &'static str, [i32; 9])], full: Bits, solid: &dyn Solid) -> Option<(&'static str, [i32; 9])> {
+    let f = bits.count_ones() as f64 / (N * N * N) as f64;
+    if bits == full {
+        return Some(("01_block", keel_io::vehicle::IDENTITY));
+    }
+    let Some(n) = surface_normal(solid, cells, k) else {
+        return if f >= 0.5 { Some(("01_block", keel_io::vehicle::IDENTITY)) } else { None };
+    };
+    let mut a: Vec<f64> = n.iter().map(|x| x.abs()).collect();
+    a.sort_by(|x, y| y.partial_cmp(x).unwrap());
+    let class = if a[1] < 0.38 { 0 } else if a[2] < 0.38 { 1 } else { 2 };
+    let best_oriented = |def: &str| {
+        lib.iter()
+            .filter(|(_, d, _)| *d == def)
+            .map(|(_, d, r)| {
+                let sn = rotate_f(r, local_slope(d));
+                (sn[0] * n[0] + sn[1] * n[1] + sn[2] * n[2], *d, *r)
+            })
+            .max_by(|x, y| x.0.partial_cmp(&y.0).unwrap())
+            .map(|(_, d, r)| (d, r))
+    };
+    match class {
+        0 => (f >= 0.5).then_some(("01_block", keel_io::vehicle::IDENTITY)),
+        1 => {
+            if f < 0.2 {
+                None
+            } else if f > 0.8 {
+                Some(("01_block", keel_io::vehicle::IDENTITY))
+            } else {
+                best_oriented("02_wedge")
+            }
+        }
+        _ => {
+            if f < 0.07 {
+                None
+            } else if f < 0.42 {
+                best_oriented("03_pyramid")
+            } else if f < 0.93 {
+                best_oriented("04_invpyramid")
+            } else {
+                Some(("01_block", keel_io::vehicle::IDENTITY))
+            }
+        }
+    }
 }
 
 #[cfg(test)]

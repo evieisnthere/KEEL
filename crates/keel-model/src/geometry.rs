@@ -425,12 +425,27 @@ fn extra_meshes(d: &Definition) -> Vec<&str> {
 
 fn mat(r: &[i32; 9]) -> [[f64; 3]; 3] {
     let mut m = [[0.0; 3]; 3];
+    let t = debug_transpose(r);
     for i in 0..3 {
         for j in 0..3 {
-            m[i][j] = r[3 * j + i] as f64;
+            m[i][j] = if t { r[3 * i + j] } else { r[3 * j + i] } as f64;
         }
     }
     m
+}
+
+fn is_three_cycle(r: &[i32; 9]) -> bool {
+    // permutation matrices with no fixed axis (no non-zero diagonal entry)
+    r[0] == 0 && r[4] == 0 && r[8] == 0 && r.iter().filter(|x| **x != 0).count() == 3
+}
+
+fn debug_transpose(r: &[i32; 9]) -> bool {
+    static MODE: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    match MODE.get_or_init(|| std::env::var("KEEL_DEBUG_TRANSPOSE").ok()).as_deref() {
+        Some("cycles") => is_three_cycle(r),
+        Some(_) => true,
+        None => false,
+    }
 }
 
 /// Diagnostic: for components whose rotation is not self-inverse, (block pieces, pieces culled against a neighbour).
@@ -439,7 +454,7 @@ pub fn pairing_stats(model: &Model, cat: &Catalogue) -> (usize, usize) {
     let asym: std::collections::HashSet<CompId> = model
         .components()
         .into_iter()
-        .filter(|(_, c)| { let r = c.rotation; (std::env::var_os("KEEL_DEBUG_SLOPES").is_some() || std::env::var_os("KEEL_DEBUG_ALL").is_some() || (0..3).any(|i| (0..3).any(|j| r[3 * i + j] != r[3 * j + i]))) && r.iter().all(|x| x.abs() <= 1) && !c.attrs.contains_key("gc") && cat.get(&c.def).is_some_and(|d| d.mesh_data_name.is_empty() && !d.surfaces.is_empty() && (std::env::var_os("KEEL_DEBUG_SLOPES").is_none() || std::env::var("KEEL_DEBUG_SLOPES").unwrap().split(',').any(|b| b.parse::<i32>().ok() == Some(d.block_type)))) })
+        .filter(|(_, c)| { let r = c.rotation; (if std::env::var_os("KEEL_DEBUG_CYCLES").is_some() { is_three_cycle(&r) } else { std::env::var_os("KEEL_DEBUG_SLOPES").is_some() || std::env::var_os("KEEL_DEBUG_ALL").is_some() || (0..3).any(|i| (0..3).any(|j| r[3 * i + j] != r[3 * j + i])) }) && r.iter().all(|x| x.abs() <= 1) && !c.attrs.contains_key("gc") && cat.get(&c.def).is_some_and(|d| d.mesh_data_name.is_empty() && !d.surfaces.is_empty() && (std::env::var_os("KEEL_DEBUG_SLOPES").is_none() || std::env::var("KEEL_DEBUG_SLOPES").unwrap().split(',').any(|b| b.parse::<i32>().ok() == Some(d.block_type)))) })
         .map(|(id, _)| id)
         .collect();
     let mut tmp = MeshLibrary::default();

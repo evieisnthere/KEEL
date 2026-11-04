@@ -2,7 +2,8 @@
 use crate::theme;
 use eframe::egui::{self, RichText};
 use keel_geom::hull::{hydrostatics, Hull, HullParams, Hydrostatics};
-use keel_geom::voxel::{voxelise, Options, Placement};
+use keel_geom::blockhull::{self, BlockHullOptions};
+use keel_geom::voxel::Placement;
 use keel_model::geometry::Face;
 use keel_model::CompId;
 use serde::{Deserialize, Serialize};
@@ -15,7 +16,7 @@ pub struct DesignDoc {
     /// voxel position of the hull's midship baseline in the vehicle
     pub origin: [i32; 3],
     pub shell: u32,
-    pub open_top: bool,
+    pub deck: bool,
     pub topside: String,
     pub bottom: String,
     /// placements written by the last bake (removed again on re-bake)
@@ -24,7 +25,7 @@ pub struct DesignDoc {
 
 impl Default for DesignDoc {
     fn default() -> Self {
-        DesignDoc { hull: HullParams::default(), origin: [0, 0, 0], shell: 1, open_top: true, topside: "E8E8E4".into(), bottom: "7A2A1E".into(), baked: vec![] }
+        DesignDoc { hull: HullParams::default(), origin: [0, 0, 0], shell: 1, deck: true, topside: "E8E8E4".into(), bottom: "7A2A1E".into(), baked: vec![] }
     }
 }
 
@@ -139,7 +140,7 @@ impl Design {
                 ui.add(egui::DragValue::new(&mut self.doc.shell).range(0..=8).suffix(" vox"));
                 ui.label(RichText::new("0 = solid").small().color(theme::TEXT_DIM));
             });
-            ui.checkbox(&mut self.doc.open_top, "Open top (deck added separately)");
+            ui.checkbox(&mut self.doc.deck, "Deck plate at the sheer");
             ui.horizontal(|ui| {
                 ui.label("Topside");
                 ui.add(egui::TextEdit::singleline(&mut self.doc.topside).desired_width(70.0));
@@ -153,7 +154,7 @@ impl Design {
                 bake = self.bake();
             }
             ui.label(
-                RichText::new("Realistic mode: standard blocks only (cube, wedge, pyramid, inverse pyramid). No XML scale edits.")
+                RichText::new("Smooth-hull builder: each section is snapped to block slopes (flat, 1:1, 1:2, 1:4) so wedges meet edge to edge. Standard blocks only, no XML scale edits.")
                     .small()
                     .color(theme::TEXT_DIM),
             );
@@ -170,18 +171,11 @@ impl Design {
 
     fn bake(&mut self) -> Option<Bake> {
         let hull = self.hull.as_ref()?;
-        let solid = keel_geom::HullSolid::new(hull);
-        let opt = Options { shell: (self.doc.shell > 0).then_some(self.doc.shell), open_top: self.doc.open_top };
         let t = std::time::Instant::now();
-        let mut placed = voxelise(&solid, &opt);
-        let wl = (self.doc.hull.draft / keel_geom::voxel::VOXEL).round() as i32;
         let o = self.doc.origin;
-        let mut add = Vec::with_capacity(placed.len());
-        for p in placed.iter_mut() {
-            let below = p.vp[1] < wl;
-            p.vp = [p.vp[0] + o[0], p.vp[1] + o[1], p.vp[2] + o[2]];
-            add.push((p.clone(), if below { self.doc.bottom.clone() } else { self.doc.topside.clone() }));
-        }
+        let placed = blockhull::build(hull, &BlockHullOptions { shell: self.doc.shell, deck: self.doc.deck, origin: o, smooth: true, waterline_bow: true });
+        let wl = (self.doc.hull.draft / keel_geom::voxel::VOXEL).round() as i32 + o[1];
+        let add = placed.iter().map(|p| (p.clone(), if p.vp[1] < wl { self.doc.bottom.clone() } else { self.doc.topside.clone() })).collect::<Vec<_>>();
         let remove = std::mem::replace(&mut self.doc.baked, placed);
         self.status = format!("Baked {} blocks in {:.1} s", add.len(), t.elapsed().as_secs_f32());
         Some(Bake { remove, add })
