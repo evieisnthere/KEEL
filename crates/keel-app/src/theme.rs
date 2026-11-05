@@ -75,7 +75,9 @@ pub fn card<R>(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
         .stroke(Stroke::new(1.0, LINE.gamma_multiply(0.6)))
         .inner_margin(Margin::symmetric(14, 12))
         .show(ui, |ui| {
-            ui.set_min_size(ui.available_size());
+            // height only: a minimum width equal to the available width would grow the panel by the card's margins
+            // every frame
+            ui.set_min_height(ui.available_height());
             add(ui)
         })
         .inner

@@ -68,6 +68,8 @@ struct KeelApp {
     mc: mc::McEditor,
     frame_next_hull: bool,
     bake_on_start: bool,
+    /// frames drawn (for KEEL_SHOT=path:frames, a screenshot after N frames)
+    frames: u64,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -118,6 +120,7 @@ impl KeelApp {
             mc: mc::McEditor::default(),
             frame_next_hull: true,
             bake_on_start: args.bake,
+            frames: 0,
             settings,
         };
         if let Some(t) = &args.tool {
@@ -964,9 +967,32 @@ fn stamp_turn(parts: &[keel_model::edit::GenPart], axis: usize) -> Vec<keel_mode
     out
 }
 
+impl KeelApp {
+    /// `KEEL_SHOT=out.png:60` saves a screenshot after 60 frames and quits (layout regression checks).
+    fn debug_shot(&mut self, ctx: &egui::Context) {
+        let Ok(spec) = std::env::var("KEEL_SHOT") else { return };
+        let (path, n) = spec.rsplit_once(':').map(|(p, n)| (p.to_string(), n.parse().unwrap_or(60))).unwrap_or((spec.clone(), 60));
+        self.frames += 1;
+        ctx.request_repaint();
+        if self.frames == n {
+            let c = ctx.clone();
+            ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::ScreenshotCallback::new(move |img| {
+                let [w, h] = img.size;
+                let bytes: Vec<u8> = img.pixels.iter().flat_map(|c| c.to_array()).collect();
+                if let Some(buf) = image::RgbaImage::from_raw(w as u32, h as u32, bytes) {
+                    let _ = buf.save(&path);
+                }
+                c.send_viewport_cmd(egui::ViewportCommand::Close);
+                c.request_repaint();
+            })));
+        }
+    }
+}
+
 impl eframe::App for KeelApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        self.debug_shot(&ctx);
         self.refresh();
         self.shortcuts(&ctx);
         self.refresh();
@@ -991,7 +1017,7 @@ impl eframe::App for KeelApp {
             });
             let mut bake = None;
             let mut generated = None;
-            egui::Panel::left("left").frame(theme::side_frame()).show_separator_line(false).default_size(300.0).show(ui, |ui| theme::card(ui, |ui| match self.mode {
+            egui::Panel::left("left").frame(theme::side_frame()).show_separator_line(false).default_size(300.0).size_range(240.0..=560.0).show(ui, |ui| theme::card(ui, |ui| match self.mode {
                 Mode::Build => self.left_panel(ui),
                 Mode::Hull => {
                     self.design.refresh();
@@ -1023,7 +1049,7 @@ impl eframe::App for KeelApp {
             if let Some(g) = generated {
                 self.apply_interior(g);
             }
-            egui::Panel::right("right").frame(theme::side_frame()).show_separator_line(false).default_size(310.0).show(ui, |ui| theme::card(ui, |ui| {
+            egui::Panel::right("right").frame(theme::side_frame()).show_separator_line(false).default_size(310.0).size_range(240.0..=560.0).show(ui, |ui| theme::card(ui, |ui| {
                 if self.mode == Mode::Hull {
                     self.design.hydro_ui(ui);
                     ui.separator();
