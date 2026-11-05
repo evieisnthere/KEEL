@@ -521,6 +521,25 @@ impl Model {
         true
     }
 
+    /// Paint each component its own colour (block and additive paint). `new_step` starts a new undo step; a brush
+    /// stroke passes true on its first dab and false after, so the whole stroke undoes at once.
+    pub fn paint_each(&mut self, paints: &[(CompId, String)], new_step: bool) {
+        if paints.is_empty() {
+            return;
+        }
+        if new_step {
+            self.checkpoint();
+        }
+        for (id, c) in paints {
+            if let Some(o) = self.component_o_mut(*id) {
+                o.set("bc", c);
+                o.set("ac", c);
+            }
+        }
+        self.generation += 1;
+        self.dirty = true;
+    }
+
     fn component_o_mut(&mut self, id: CompId) -> Option<&mut Element> {
         let cs = self.components_el_mut(id.body)?;
         cs.elements_mut().filter(|e| e.tag == "c").nth(id.comp)?.find_mut("o")

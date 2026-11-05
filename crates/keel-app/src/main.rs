@@ -7,6 +7,7 @@ mod game;
 mod icons;
 mod interior;
 mod mc;
+mod paint;
 mod palette;
 mod tools;
 mod wiring;
@@ -77,6 +78,9 @@ struct KeelApp {
     /// textures of saved-vehicle thumbnails in the library dialog
     library_thumbs: std::collections::HashMap<PathBuf, Option<egui::TextureHandle>>,
     pending_thumb: Option<image::RgbaImage>,
+    /// parts already painted in the current brush stroke
+    stroke: HashSet<CompId>,
+    livery_on_start: bool,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -135,6 +139,8 @@ impl KeelApp {
             export_thumb: None,
             library_thumbs: Default::default(),
             pending_thumb: None,
+            stroke: HashSet::new(),
+            livery_on_start: args.livery,
             settings,
         };
         if let Some(t) = &args.tool {
@@ -259,15 +265,16 @@ impl KeelApp {
                 self.cam.dist /= self.zoom;
                 self.frame_next_hull = false;
             }
-            if self.bake_on_start {
-                self.bake_on_start = false;
-                self.design.show_preview = false;
-                self.design.refresh();
-                if let Some(b) = self.design.bake_now() {
-                    self.apply_bake(b);
-                    self.frame_next = true;
-                    self.faces_gen = u64::MAX;
-                }
+        }
+        // --bake-hull (any mode): bake the current hull design once at start-up
+        if self.bake_on_start {
+            self.bake_on_start = false;
+            self.design.show_preview = false;
+            self.design.refresh();
+            if let Some(b) = self.design.bake_now() {
+                self.apply_bake(b);
+                self.frame_next = true;
+                self.faces_gen = u64::MAX;
             }
         }
         let key = (self.faces_gen, sel_key ^ if show_hull { self.design.generation.wrapping_mul(0x9e37_79b9) } else { 0 });
@@ -447,6 +454,54 @@ impl KeelApp {
             self.mc.open(id, &self.model);
             self.status = format!("Added a microcontroller at {:?}", [0, top, 0]);
         }
+    }
+
+    /// One brush dab: the part under the cursor (or every part within the brush radius), mirrored if Mirror is on,
+    /// each with its own seeded variation of the brush colour. Parts already painted in this stroke are skipped.
+    fn dab(&mut self, comp: CompId, point: [f32; 3], new_step: bool) {
+        let d = self.design.doc.paint.clone();
+        let comps = self.model.components();
+        let centre = [0, 1, 2].map(|i| (point[i] / 0.25).round() as i32);
+        let r = d.radius;
+        let hit_voxel = comps.iter().find(|(id, _)| *id == comp).map(|(_, c)| (c.voxel, c.def.clone()));
+        let mut targets: Vec<(CompId, [i32; 3])> = vec![];
+        for (id, c) in &comps {
+            if id.body != comp.body {
+                continue;
+            }
+            let near = |v: [i32; 3]| r > 0.0 && (0..3).map(|i| ((c.voxel[i] - v[i]) as f32).powi(2)).sum::<f32>() <= r * r;
+            let twin = self.tools.mirror && hit_voxel.as_ref().is_some_and(|(v, def)| c.voxel == [-v[0], v[1], v[2]] && &c.def == def);
+            let mirrored = self.tools.mirror && near([-centre[0], centre[1], centre[2]]);
+            if *id == comp || near(centre) || twin || mirrored {
+                targets.push((*id, c.voxel));
+            }
+        }
+        let paints: Vec<(CompId, String)> = targets
+            .into_iter()
+            .filter(|(id, _)| self.stroke.insert(*id))
+            .map(|(id, v)| (id, paint::hex(paint::vary(self.tools.colour, d.variation, d.jitter, d.seed, v))))
+            .collect();
+        self.model.paint_each(&paints, new_step);
+    }
+
+    /// Apply the livery to the selection (or the whole vehicle) as one undo step.
+    fn apply_livery(&mut self, default_waterline: Option<f32>) {
+        let d = self.design.doc.paint.clone();
+        let comps = self.model.components();
+        let targets: Vec<_> = comps
+            .iter()
+            .filter(|(id, _)| self.selected.is_empty() || self.selected.contains(id))
+            .filter(|(_, c)| !d.blocks_only || self.catalogue.get(&c.def).is_some_and(|x| x.category == 0))
+            .collect();
+        if targets.is_empty() {
+            self.status = "Nothing to paint".into();
+            return;
+        }
+        let (bottom, top) = targets.iter().map(|(_, c)| c.voxel[1] as f32 * 0.25).fold((f32::MAX, f32::MIN), |a, y| (a.0.min(y), a.1.max(y)));
+        let wl = d.waterline.or(default_waterline).unwrap_or(0.0);
+        let paints: Vec<(CompId, String)> = targets.iter().map(|(id, c)| (*id, paint::hex(paint::livery(&d, c.voxel, wl, bottom, top)))).collect();
+        self.model.paint_each(&paints, true);
+        self.status = format!("Livery applied to {} parts (one undo step)", paints.len());
     }
 
     fn copy_selection(&mut self) {
@@ -747,6 +802,14 @@ impl KeelApp {
             }
             ui.label(RichText::new(format!("{} wires in this vehicle", self.model.links().len())).small().color(theme::TEXT_DIM));
             ui.separator();
+        }
+        if self.tool == Tool::Paint {
+            let wl = self.design.hull.as_ref().map(|_| (self.design.doc.hull.draft + self.design.doc.origin[1] as f64 * 0.25) as f32);
+            let n = self.selected.len();
+            if let Some(paint::Action::ApplyLivery) = paint::panel_ui(ui, &mut self.design.doc.paint, &mut self.tools.colour, wl, n) {
+                self.apply_livery(wl);
+            }
+            return;
         }
         if self.tool == Tool::Measure {
             theme::section(ui, "Measure");
@@ -1236,6 +1299,11 @@ impl eframe::App for KeelApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.debug_shot(&ctx);
+        if self.livery_on_start && !self.model.components().is_empty() && !self.bake_on_start {
+            self.livery_on_start = false;
+            let wl = self.design.hull.as_ref().map(|_| (self.design.doc.hull.draft + self.design.doc.origin[1] as f64 * 0.25) as f32);
+            self.apply_livery(wl);
+        }
         self.refresh();
         self.shortcuts(&ctx);
         self.refresh();
@@ -1354,7 +1422,23 @@ impl eframe::App for KeelApp {
                     ghost = Some(geometry::build_faces(&tmp, &self.catalogue));
                 }
             }
-            let r = viewport::show(ui, &mut self.cam, &self.renderer, ghost.as_deref());
+            let r = viewport::show_with(ui, &mut self.cam, &self.renderer, ghost.as_deref(), self.tool == Tool::Paint);
+            if self.tool == Tool::Paint {
+                if let (Some((_, started)), Some(h)) = (r.tool_drag, &hit) {
+                    if started {
+                        self.stroke.clear();
+                    }
+                    let alt = ui.input(|i| i.modifiers.alt);
+                    if !alt {
+                        let first = self.stroke.is_empty();
+                        self.dab(h.comp, h.point, first);
+                    }
+                }
+                if r.tool_drag_stopped && !self.stroke.is_empty() {
+                    self.status = format!("Painted {} parts (one undo step)", self.stroke.len());
+                    self.stroke.clear();
+                }
+            }
             if !self.clean {
                 theme::round_corners(ui.painter(), rect);
             }
@@ -1427,16 +1511,10 @@ impl eframe::App for KeelApp {
                                     self.status = format!("Picked colour {bc}");
                                 }
                             } else {
-                                let mut ids = vec![h.comp];
-                                if self.tools.mirror {
-                                    if let Some((_, c)) = comps.iter().find(|(id, _)| *id == h.comp) {
-                                        let m = [-c.voxel[0], c.voxel[1], c.voxel[2]];
-                                        ids.extend(comps.iter().filter(|(id, o)| id.body == h.comp.body && o.voxel == m && o.def == c.def && *id != h.comp).map(|(id, _)| *id));
-                                    }
-                                }
-                                let hx = tools::hex(self.tools.colour);
-                                self.model.set_paint(&ids, Some(&hx), None);
-                                self.status = format!("Painted {} part(s) {hx}", ids.len());
+                                self.stroke.clear();
+                                self.dab(h.comp, h.point, true);
+                                self.status = format!("Painted {} part(s)", self.stroke.len());
+                                self.stroke.clear();
                             }
                         }
                     }
@@ -1473,10 +1551,11 @@ struct Args {
     plan_docked: bool,
     tool: Option<String>,
     dialog: Option<String>,
+    livery: bool,
 }
 
 fn parse_args() -> Args {
-    let mut a = Args { vehicle: None, defs: None, rom: None, view: None, clean: false, zoom: 1.0, look: None, mode: None, bake: false, plan_docked: false, tool: None, dialog: None };
+    let mut a = Args { vehicle: None, defs: None, rom: None, view: None, clean: false, zoom: 1.0, look: None, mode: None, bake: false, plan_docked: false, tool: None, dialog: None, livery: false };
     let mut it = std::env::args().skip(1);
     while let Some(x) = it.next() {
         if x == "--defs" {
@@ -1485,6 +1564,8 @@ fn parse_args() -> Args {
             a.plan_docked = true;
         } else if x == "--bake-hull" {
             a.bake = true;
+        } else if x == "--livery" {
+            a.livery = true;
         } else if x == "--dialog" {
             a.dialog = it.next();
         } else if x == "--tool" {

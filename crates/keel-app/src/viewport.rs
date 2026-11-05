@@ -196,6 +196,9 @@ struct Gpu {
     vbo: glow::Buffer,
     opaque: i32,
     glass: i32,
+    /// floor grid lines, re-uploaded each frame (depth-tested so the vehicle hides them)
+    gvao: glow::VertexArray,
+    gvbo: glow::Buffer,
 }
 
 /// Shared between the UI thread and the paint callback.
@@ -273,10 +276,21 @@ impl Renderer {
         gl.enable_vertex_attrib_array(2);
         gl.vertex_attrib_pointer_f32(2, 4, glow::UNSIGNED_BYTE, true, STRIDE, 24);
         gl.bind_vertex_array(None);
-        Gpu { program, vao, vbo, opaque: 0, glass: 0 }
+        let gvao = gl.create_vertex_array().unwrap();
+        let gvbo = gl.create_buffer().unwrap();
+        gl.bind_vertex_array(Some(gvao));
+        gl.bind_buffer(glow::ARRAY_BUFFER, Some(gvbo));
+        gl.enable_vertex_attrib_array(0);
+        gl.vertex_attrib_pointer_f32(0, 3, glow::FLOAT, false, STRIDE, 0);
+        gl.enable_vertex_attrib_array(1);
+        gl.vertex_attrib_pointer_f32(1, 3, glow::FLOAT, false, STRIDE, 12);
+        gl.enable_vertex_attrib_array(2);
+        gl.vertex_attrib_pointer_f32(2, 4, glow::UNSIGNED_BYTE, true, STRIDE, 24);
+        gl.bind_vertex_array(None);
+        Gpu { program, vao, vbo, opaque: 0, glass: 0, gvao, gvbo }
     }
 
-    unsafe fn paint(&mut self, gl: &glow::Context, view: &View, vp: eframe::epaint::ViewportInPixels) {
+    unsafe fn paint(&mut self, gl: &glow::Context, view: &View, vp: eframe::epaint::ViewportInPixels, grid: &[u8]) {
         if self.gpu.is_none() {
             self.gpu = Some(Self::init(gl));
         }
@@ -303,6 +317,18 @@ impl Renderer {
         gl.bind_vertex_array(Some(gpu.vao));
         gl.disable(glow::BLEND);
         gl.draw_arrays(glow::TRIANGLES, 0, gpu.opaque);
+        if !grid.is_empty() {
+            gl.bind_vertex_array(Some(gpu.gvao));
+            gl.bind_buffer(glow::ARRAY_BUFFER, Some(gpu.gvbo));
+            gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, grid, glow::STREAM_DRAW);
+            gl.enable(glow::BLEND);
+            gl.blend_func(glow::SRC_ALPHA, glow::ONE_MINUS_SRC_ALPHA);
+            gl.depth_mask(false);
+            gl.draw_arrays(glow::LINES, 0, grid.len() as i32 / STRIDE);
+            gl.depth_mask(true);
+            gl.disable(glow::BLEND);
+            gl.bind_vertex_array(Some(gpu.vao));
+        }
         if gpu.glass > 0 {
             gl.enable(glow::BLEND);
             gl.blend_func(glow::SRC_ALPHA, glow::ONE_MINUS_SRC_ALPHA);
@@ -319,17 +345,25 @@ impl Renderer {
 
 pub struct Response {
     pub clicked: Option<(Pos2, egui::Modifiers)>,
+    /// primary-button drag in progress when the primary button is a tool (not orbit): (pointer, started this frame)
+    pub tool_drag: Option<(Pos2, bool)>,
+    pub tool_drag_stopped: bool,
 }
 
 /// Draw the scene and handle camera input. `ghost` faces (placement preview) are outlined on top.
-pub fn show(ui: &mut egui::Ui, cam: &mut Camera, renderer: &Arc<Mutex<Renderer>>, ghost: Option<&[Face]>) -> Response {
+/// Draw the scene and handle camera input; with `primary_tool` the left button belongs to the active tool (drag painting) and the middle button
+/// orbits.
+pub fn show_with(ui: &mut egui::Ui, cam: &mut Camera, renderer: &Arc<Mutex<Renderer>>, ghost: Option<&[Face]>, primary_tool: bool) -> Response {
     let (rect, resp) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
-    if resp.dragged_by(egui::PointerButton::Primary) {
+    let orbit_button = if primary_tool { egui::PointerButton::Middle } else { egui::PointerButton::Primary };
+    let tool_drag = (primary_tool && resp.dragged_by(egui::PointerButton::Primary)).then(|| resp.interact_pointer_pos().map(|p| (p, resp.drag_started_by(egui::PointerButton::Primary)))).flatten();
+    let tool_drag_stopped = primary_tool && resp.drag_stopped_by(egui::PointerButton::Primary);
+    if resp.dragged_by(orbit_button) {
         let d = resp.drag_delta();
         cam.yaw -= d.x * 0.008;
         cam.pitch = (cam.pitch + d.y * 0.008).clamp(-1.55, 1.55);
     }
-    if resp.dragged_by(egui::PointerButton::Secondary) || resp.dragged_by(egui::PointerButton::Middle) {
+    if resp.dragged_by(egui::PointerButton::Secondary) || (!primary_tool && resp.dragged_by(egui::PointerButton::Middle)) {
         let d = resp.drag_delta();
         let v = cam.view(rect);
         let s = cam.dist / v.focal;
@@ -344,41 +378,41 @@ pub fn show(ui: &mut egui::Ui, cam: &mut Camera, renderer: &Arc<Mutex<Renderer>>
         }
     }
     let view = cam.view(rect);
-    let r = renderer.clone();
-    let cb = egui_glow::CallbackFn::new(move |info, painter| {
-        let vp = info.viewport_in_pixels();
-        unsafe { r.lock().unwrap().paint(painter.gl(), &view, vp) };
-    });
-    let painter = ui.painter_at(rect);
-    painter.add(egui::PaintCallback { rect, callback: Arc::new(cb) });
-
-    // blueprint grid on the y = 0 plane around the camera target (1 m minor, 5 m major)
+    // floor grid on y = 0 around the camera target (1 m minor, 5 m major), drawn by GL with depth so parts hide it
+    let mut grid: Vec<u8> = Vec::new();
     {
         let step = if cam.dist > 120.0 { 5.0 } else { 1.0 };
         let n = 30;
         let cx = (cam.target[0] / step).round() * step;
         let cz = (cam.target[2] / step).round() * step;
+        let g = crate::theme::GRID;
+        let mut push = |p: [f32; 3], col: [u8; 4]| {
+            for x in p.iter().chain([0.0f32, 0.5, 0.0].iter()) {
+                grid.extend_from_slice(&x.to_le_bytes());
+            }
+            grid.extend_from_slice(&col);
+        };
         for k in -n..=n {
             let major = ((k as f32 * step + cx) / (step * 5.0)).fract().abs() < 1e-3;
-            let col = if major { crate::theme::GRID.gamma_multiply(1.6) } else { crate::theme::GRID };
+            // brighter than the old overlay: the shader's lighting dims flat colours a little
+            let col = if major { [0x5a, 0x66, 0xc0, 0xb0] } else { [g.r().saturating_add(0x20), g.g().saturating_add(0x20), g.b().saturating_add(0x40), 0x80] };
             for (a, b) in [
                 ([cx + k as f32 * step, 0.0, cz - n as f32 * step], [cx + k as f32 * step, 0.0, cz + n as f32 * step]),
                 ([cx - n as f32 * step, 0.0, cz + k as f32 * step], [cx + n as f32 * step, 0.0, cz + k as f32 * step]),
             ] {
-                // clip the segment to the region in front of the camera
-                let (ca, cb) = (view.cam(a), view.cam(b));
-                let near = view.near * 2.0;
-                if ca[2] < near && cb[2] < near {
-                    continue;
-                }
-                let lerp = |p: [f32; 3], q: [f32; 3], t: f32| [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t];
-                let (a2, b2) = if ca[2] < near { (lerp(a, b, (near - ca[2]) / (cb[2] - ca[2])), b) } else if cb[2] < near { (a, lerp(b, a, (near - cb[2]) / (ca[2] - cb[2]))) } else { (a, b) };
-                if let (Some(p), Some(q)) = (view.project(a2), view.project(b2)) {
-                    painter.line_segment([p.0, q.0], Stroke::new(if major { 1.0 } else { 0.6 }, col));
-                }
+                push(a, col);
+                push(b, col);
             }
         }
     }
+    let r = renderer.clone();
+    let cb = egui_glow::CallbackFn::new(move |info, painter| {
+        let vp = info.viewport_in_pixels();
+        unsafe { r.lock().unwrap().paint(painter.gl(), &view, vp, &grid) };
+    });
+    let painter = ui.painter_at(rect);
+    painter.add(egui::PaintCallback { rect, callback: Arc::new(cb) });
+
     if let Some(g) = ghost {
         for f in g {
             let pts: Vec<Pos2> = f.verts.iter().filter_map(|v| view.project(*v).map(|x| x.0)).collect();
@@ -394,5 +428,5 @@ pub fn show(ui: &mut egui::Ui, cam: &mut Camera, renderer: &Arc<Mutex<Renderer>>
         painter.text(g + e * 1.2, egui::Align2::CENTER_CENTER, name, egui::FontId::proportional(12.0), col);
     }
     let clicked = if resp.clicked() { resp.interact_pointer_pos().map(|p| (p, ui.input(|i| i.modifiers))) } else { None };
-    Response { clicked }
+    Response { clicked, tool_drag, tool_drag_stopped }
 }
