@@ -14,6 +14,7 @@ pub mod furnish;
 pub mod light;
 pub mod plan;
 pub mod programme;
+pub mod propulsion;
 pub mod space;
 pub mod structure;
 pub mod superstructure;
@@ -35,6 +36,8 @@ pub struct LayoutOptions {
     pub plan: plan::PlanOptions,
     pub finish: structure::Finish,
     pub lighting: electrics::LightingOptions,
+    /// install the propulsion (engine or motor, fuel, shaft, propeller, rudder, controls)
+    pub propulsion: Option<propulsion::PropulsionOptions>,
 }
 
 /// A generated interior.
@@ -43,6 +46,7 @@ pub struct Layout {
     pub build: Build,
     pub circuits: Vec<electrics::Circuit>,
     pub programme: Vec<programme::RoomReq>,
+    pub propulsion: Option<propulsion::Report>,
 }
 
 /// Weather deck plating row at midships for a built hull.
@@ -123,7 +127,11 @@ pub fn generate(hull: &HullBlocks, opt: &LayoutOptions) -> Layout {
     build.extend(fb);
     let (eb, circuits) = electrics::wire(&plan, &used, &opt.lighting);
     build.extend(eb);
-    Layout { plan, build, circuits, programme: prog }
+    let propulsion = opt.propulsion.as_ref().map(|p| {
+        let inside = |v: [i32; 3]| hs.inside(v);
+        propulsion::install(&plan, &hull.occupied, &inside, &mut build, p)
+    });
+    Layout { plan, build, circuits, programme: prog, propulsion }
 }
 
 #[cfg(test)]
@@ -146,6 +154,7 @@ mod tests {
             plan: Default::default(),
             finish: Default::default(),
             lighting: Default::default(),
+            propulsion: None,
         };
         let l = generate(&hb, &opt);
         eprintln!("decks:");
@@ -178,6 +187,7 @@ mod tests {
             plan: Default::default(),
             finish: Default::default(),
             lighting: Default::default(),
+            propulsion: None,
         };
         let l = generate(&hb, &opt);
         let mut m = keel_model::Model::new_empty();
@@ -209,6 +219,7 @@ mod tests {
             plan: Default::default(),
             finish: Default::default(),
             lighting: Default::default(),
+            propulsion: None,
         };
         let l = generate(&hb, &opt);
         let mut m = keel_model::Model::new_empty();

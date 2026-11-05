@@ -37,6 +37,10 @@ pub struct InteriorDoc {
     /// what the last generation added (removed again on regenerate)
     pub generated: Vec<(String, [i32; 3], [i32; 9])>,
     pub generated_links: Vec<(i32, [i32; 3], [i32; 3])>,
+    /// install the Power-mode drive with the interior
+    pub install_propulsion: bool,
+    /// hull parts a generated pipe or shaft displaced: (def, voxel, rotation, paint); restored if the route moves
+    pub displaced: Vec<(String, [i32; 3], [i32; 9], Option<String>)>,
 }
 
 impl Default for InteriorDoc {
@@ -56,12 +60,19 @@ impl Default for InteriorDoc {
             light_kelvin: BTreeMap::new(),
             generated: vec![],
             generated_links: vec![],
+            install_propulsion: true,
+            displaced: vec![],
         }
     }
 }
 
 pub struct Interior {
     pub doc: InteriorDoc,
+    /// the drive to install (from Power mode), set by the app
+    pub propulsion: Option<keel_layout::propulsion::PropulsionOptions>,
+    pub propulsion_summary: String,
+    /// what the last installation did
+    pub propulsion_report: Option<keel_layout::propulsion::Report>,
     hull_key: Option<(HullParams, [i32; 3])>,
     pub hull: Option<HullBlocks>,
     plan_key: String,
@@ -81,6 +92,9 @@ impl Default for Interior {
     fn default() -> Self {
         Interior {
             doc: InteriorDoc::default(),
+            propulsion: None,
+            propulsion_summary: String::new(),
+            propulsion_report: None,
             hull_key: None,
             hull: None,
             plan_key: String::new(),
@@ -161,6 +175,7 @@ impl Interior {
             plan: PlanOptions { corridor_width: self.doc.corridor_width, stairs: self.doc.stairs },
             finish: Default::default(),
             lighting,
+            propulsion: if self.doc.install_propulsion { self.propulsion.clone() } else { None },
         })
     }
 
@@ -201,6 +216,7 @@ impl Interior {
         let opt = self.layout_options()?;
         let h = self.hull.as_ref()?;
         let layout = keel_layout::generate(h, &opt);
+        self.propulsion_report = layout.propulsion.clone();
         Some(Generated { layout })
     }
 
@@ -350,10 +366,22 @@ impl Interior {
                 if ui.button(if self.window_open { "Close floor plan" } else { "Floor plan window" }).clicked() {
                     self.window_open = !self.window_open;
                 }
-                if ui.button(RichText::new("Generate interior").strong()).on_hover_text("Floors, walls, doors, stairs, furniture, lights, switches and wiring, in one undo step").clicked() {
+                if ui.button(RichText::new("Generate").strong()).on_hover_text("Floors, walls, doors, stairs, furniture, lights, switches and wiring, and the propulsion if ticked, in one undo step").clicked() {
                     out = self.generate();
                 }
             });
+            ui.add_space(6.0);
+            theme::section(ui, "Propulsion");
+            ui.checkbox(&mut self.doc.install_propulsion, "Install the drive from Power mode");
+            ui.label(RichText::new(&self.propulsion_summary).small().color(theme::TEXT_DIM));
+            if let Some(r) = &self.propulsion_report {
+                for n in &r.notes {
+                    ui.label(RichText::new(n).small());
+                }
+                for w in &r.warnings {
+                    ui.label(RichText::new(w).small().color(theme::ORANGE));
+                }
+            }
             if !self.status.is_empty() {
                 ui.label(RichText::new(&self.status).small().color(theme::CYAN));
             }

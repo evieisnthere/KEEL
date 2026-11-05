@@ -24,11 +24,15 @@ pub struct DesignDoc {
     pub interior: crate::interior::InteriorDoc,
     /// powertrain design (Power mode)
     pub power: crate::power::PowerDoc,
+    /// paint brush and livery settings
+    pub paint: crate::paint::PaintDoc,
+    /// decals on paintable signs (editable after placing)
+    pub decals: Vec<crate::decal::Decal>,
 }
 
 impl Default for DesignDoc {
     fn default() -> Self {
-        DesignDoc { hull: HullParams::default(), origin: [0, 0, 0], shell: 1, deck: true, topside: "E8E8E4".into(), bottom: "7A2A1E".into(), baked: vec![], interior: Default::default(), power: Default::default() }
+        DesignDoc { hull: HullParams::default(), origin: [0, 0, 0], shell: 1, deck: true, topside: "E8E8E4".into(), bottom: "7A2A1E".into(), baked: vec![], interior: Default::default(), power: Default::default(), paint: Default::default(), decals: vec![] }
     }
 }
 

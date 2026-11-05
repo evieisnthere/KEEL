@@ -136,7 +136,7 @@ impl Palette {
                 Some(i) => CATEGORIES[i].to_string(),
                 None => "Favourites".to_string(),
             };
-            egui::ComboBox::from_id_salt("palette_cat").selected_text(label).width(ui.available_width() - 40.0).height(420.0).show_ui(ui, |ui| {
+            egui::ComboBox::from_id_salt("palette_cat").selected_text(label).width((ui.available_width() - 56.0).max(80.0)).height(420.0).show_ui(ui, |ui| {
                 for (i, c) in CATEGORIES.iter().enumerate() {
                     if ui.selectable_label(self.category == Some(i), *c).clicked() {
                         self.category = Some(i);
@@ -189,7 +189,8 @@ impl Palette {
 
     fn tiles(&mut self, ui: &mut egui::Ui, cat: &Catalogue, meshes: &mut MeshLibrary, ids: &[String], current: &str, salt: &str) -> Option<String> {
         let mut chosen = None;
-        let per_row = ((ui.available_width() + 4.0) / (self.tile + 4.0)).floor().max(1.0) as usize;
+        // leave room for the scroll bar so the grid never asks for more width than the panel has
+        let per_row = ((ui.available_width() - 14.0) / (self.tile + 4.0)).floor().max(1.0) as usize;
         // a few new thumbnails per frame keep the UI responsive
         let mut budget = 6;
         egui::Grid::new(format!("tiles_{salt}")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {

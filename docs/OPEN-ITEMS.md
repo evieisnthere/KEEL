@@ -31,12 +31,19 @@ is closed, delete it here and update the RE document.
 |---|---|---|---|
 | B1 | Vehicle `t` attribute, `sc` format, multi-body joint fields, and many `<o>` properties are unmapped. Round-trip is byte-exact, but authoring new parts needs them | RE-0002 | RE + corpus survey |
 | B2 | A KEEL-exported vehicle has never been loaded in game (round-trip R1/R2 in the test pack) | STATUS row 9 | GAME |
+| B4 | Export writes `<name>.xml` and a 512×512 `<name>.png` into the game's vehicles folder (`%APPDATA%\Stormworks\data\vehicles`, or the Proton prefix on Linux). That the game lists the PNG as the vehicle's thumbnail is unconfirmed | `keel-app/src/game.rs` | GAME |
+| B5 | Paintable sign / indicator pixels (`gc`, 81 colours): rows follow local +Z and columns local +X. Inferred from seam continuity between neighbouring signs in the corpus (rows 6812 vs 3503, columns 6013 vs 3082 seams favour this order); which way is "up" on screen is not confirmed, so decals offer flips | `keel-app/src/decal.rs` | GAME |
 | B3 | Unconfirmed conventions: rotation matrix convention (column-major) and the voxel-face flooding mask meaning | RE-0002 | GAME |
 
 ## C. In-game calibration the user has been sent (`keel_test_pack.zip`)
 Barges A–F (draft, sealing, door frames), round-trip R1/R2. Still to add to the pack: **R3** (rudder force vs hull mass),
 **L1** (logic tick counting), **E1** (battery drain with a motor at fixed throttle), **S1** (straight-line top speed of
 3556526754 at full throttle).
+
+**C2 (propulsion installer check):** generate a workboat in Decks mode with "Install the drive from Power mode" ticked,
+export it, and in game: turn the key (starter should run until the engine turns), raise the throttle lever (clutch
+engages, boat moves), steer with A/D. Report anything that does not connect (fuel, air, exhaust, cooling, shaft). The
+engine layout follows working corpus engines but has not been run in game.
 
 **C1 (propulsion calibration, requested 2026-11-04):** the KEEL "Planing" preset hull baked and saved from KEEL, plus
 one large electric motor driving one small propeller directly, a small battery and a throttle lever at 100 %. Report

@@ -11,3 +11,4 @@ serde_json = "1"
 keel-model = { path = "../keel-model" }
 keel-io = { path = "../keel-io" }
 keel-geom = { path = "../keel-geom" }
+keel-mc = { path = "../keel-mc" }

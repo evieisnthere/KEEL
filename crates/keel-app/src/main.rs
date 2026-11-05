@@ -2,10 +2,13 @@
 //! KEEL desktop application.
 //!
 //! Usage: `keel [vehicle.xml] [--defs <rom/data/definitions>]`. The definitions folder is remembered in the settings file.
+mod decal;
 mod design;
+mod game;
 mod icons;
 mod interior;
 mod mc;
+mod paint;
 mod palette;
 mod tools;
 mod wiring;
@@ -68,6 +71,18 @@ struct KeelApp {
     mc: mc::McEditor,
     frame_next_hull: bool,
     bake_on_start: bool,
+    /// frames drawn (for KEEL_SHOT=path:frames, a screenshot after N frames)
+    frames: u64,
+    export_name: String,
+    /// thumbnail preview for the export dialog (rendered when the dialog opens)
+    export_thumb: Option<(image::RgbaImage, egui::TextureHandle)>,
+    /// textures of saved-vehicle thumbnails in the library dialog
+    library_thumbs: std::collections::HashMap<PathBuf, Option<egui::TextureHandle>>,
+    pending_thumb: Option<image::RgbaImage>,
+    /// parts already painted in the current brush stroke
+    stroke: HashSet<CompId>,
+    livery_on_start: bool,
+    decal_ui: decal::DecalUi,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -76,6 +91,9 @@ enum Dialog {
     SaveAs,
     Settings,
     Scale,
+    Welcome,
+    Export,
+    Library,
 }
 
 impl KeelApp {
@@ -118,6 +136,14 @@ impl KeelApp {
             mc: mc::McEditor::default(),
             frame_next_hull: true,
             bake_on_start: args.bake,
+            frames: 0,
+            export_name: String::new(),
+            export_thumb: None,
+            library_thumbs: Default::default(),
+            pending_thumb: None,
+            stroke: HashSet::new(),
+            livery_on_start: args.livery,
+            decal_ui: Default::default(),
             settings,
         };
         if let Some(t) = &args.tool {
@@ -130,9 +156,39 @@ impl KeelApp {
             app.cam.yaw = y;
             app.cam.pitch = p;
         }
+        // first run: find the game through Steam, otherwise ask with a folder picker (no paths to type)
+        if app.settings.definitions_dir.as_ref().is_none_or(|d| !d.is_dir()) {
+            match game::find_game() {
+                Some(g) => {
+                    app.settings.definitions_dir = Some(game::definitions_of(&g));
+                    app.settings.save();
+                }
+                None => app.dialog = Some(Dialog::Welcome),
+            }
+        }
+        if app.settings.vehicles_dir.as_ref().is_none_or(|d| !d.is_dir()) {
+            app.settings.vehicles_dir = game::vehicles_dir();
+            app.settings.save();
+        }
         app.load_catalogue();
         if let Some(p) = args.vehicle {
             app.open(p);
+        }
+        if let Some(img) = &args.decal_demo {
+            // screenshot check: an 8×4 panel of paintable signs with the image on it
+            let parts: Vec<keel_model::edit::GenPart> = (0..8).flat_map(|x| (0..4).map(move |z| keel_model::edit::GenPart { def: "sign_na".into(), vp: [x - 4, 0, z], r: keel_io::vehicle::IDENTITY, bc: Some("FFFFFF".into()), ac: None })).collect();
+            app.model.apply_build(0, &[], &parts, &[]);
+            app.selected = app.model.components().into_iter().map(|(id, _)| id).collect();
+            if let Ok((png, _)) = decal::load_image(img) {
+                app.add_decal("demo", png);
+            }
+            app.tool = Tool::Decal;
+        }
+        match args.dialog.as_deref() {
+            Some("export") => app.open_export(),
+            Some("library") => app.dialog = Some(Dialog::Library),
+            Some("welcome") => app.dialog = Some(Dialog::Welcome),
+            _ => {}
         }
         app
     }
@@ -222,15 +278,16 @@ impl KeelApp {
                 self.cam.dist /= self.zoom;
                 self.frame_next_hull = false;
             }
-            if self.bake_on_start {
-                self.bake_on_start = false;
-                self.design.show_preview = false;
-                self.design.refresh();
-                if let Some(b) = self.design.bake_now() {
-                    self.apply_bake(b);
-                    self.frame_next = true;
-                    self.faces_gen = u64::MAX;
-                }
+        }
+        // --bake-hull (any mode): bake the current hull design once at start-up
+        if self.bake_on_start {
+            self.bake_on_start = false;
+            self.design.show_preview = false;
+            self.design.refresh();
+            if let Some(b) = self.design.bake_now() {
+                self.apply_bake(b);
+                self.frame_next = true;
+                self.faces_gen = u64::MAX;
             }
         }
         let key = (self.faces_gen, sel_key ^ if show_hull { self.design.generation.wrapping_mul(0x9e37_79b9) } else { 0 });
@@ -287,6 +344,9 @@ impl KeelApp {
             return;
         }
         let ids = self.sel();
+        if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::E)) {
+            self.open_export();
+        }
         let (copy, paste, mirror) = ctx.input(|i| (i.modifiers.command && i.key_pressed(egui::Key::C), i.modifiers.command && i.key_pressed(egui::Key::V), !i.modifiers.command && i.key_pressed(egui::Key::M)));
         if copy && !ids.is_empty() {
             self.copy_selection();
@@ -409,6 +469,80 @@ impl KeelApp {
         }
     }
 
+    /// One brush dab: the part under the cursor (or every part within the brush radius), mirrored if Mirror is on,
+    /// each with its own seeded variation of the brush colour. Parts already painted in this stroke are skipped.
+    fn dab(&mut self, comp: CompId, point: [f32; 3], new_step: bool) {
+        let d = self.design.doc.paint.clone();
+        let comps = self.model.components();
+        let centre = [0, 1, 2].map(|i| (point[i] / 0.25).round() as i32);
+        let r = d.radius;
+        let hit_voxel = comps.iter().find(|(id, _)| *id == comp).map(|(_, c)| (c.voxel, c.def.clone()));
+        let mut targets: Vec<(CompId, [i32; 3])> = vec![];
+        for (id, c) in &comps {
+            if id.body != comp.body {
+                continue;
+            }
+            let near = |v: [i32; 3]| r > 0.0 && (0..3).map(|i| ((c.voxel[i] - v[i]) as f32).powi(2)).sum::<f32>() <= r * r;
+            let twin = self.tools.mirror && hit_voxel.as_ref().is_some_and(|(v, def)| c.voxel == [-v[0], v[1], v[2]] && &c.def == def);
+            let mirrored = self.tools.mirror && near([-centre[0], centre[1], centre[2]]);
+            if *id == comp || near(centre) || twin || mirrored {
+                targets.push((*id, c.voxel));
+            }
+        }
+        let paints: Vec<(CompId, String)> = targets
+            .into_iter()
+            .filter(|(id, _)| self.stroke.insert(*id))
+            .map(|(id, v)| (id, paint::hex(paint::vary(self.tools.colour, d.variation, d.jitter, d.seed, v))))
+            .collect();
+        self.model.paint_each(&paints, new_step);
+    }
+
+    /// Pick an image and put it on the selected signs (one undo step).
+    fn new_decal(&mut self) {
+        let Some(p) = rfd::FileDialog::new().set_title("Choose an image for the decal").add_filter("Images", &["png", "jpg", "jpeg"]).pick_file() else { return };
+        match decal::load_image(&p) {
+            Ok((png, _)) => {
+                let name = p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+                self.add_decal(&name, png);
+            }
+            Err(e) => self.status = format!("Could not read the image: {e}"),
+        }
+    }
+
+    fn add_decal(&mut self, name: &str, png: String) {
+        let sel = self.sel();
+        match decal::create(&self.model, &sel, name, png) {
+            Ok(d) => {
+                let e = decal::edits(&self.model, &d, false);
+                self.model.set_attr_each(&e, true);
+                self.design.doc.decals.push(d);
+                self.decal_ui.current = Some(self.design.doc.decals.len() - 1);
+                self.status = format!("Decal added on {} sign(s). Adjust it on the left at any time.", e.len());
+            }
+            Err(m) => self.status = m,
+        }
+    }
+
+    /// Apply the livery to the selection (or the whole vehicle) as one undo step.
+    fn apply_livery(&mut self, default_waterline: Option<f32>) {
+        let d = self.design.doc.paint.clone();
+        let comps = self.model.components();
+        let targets: Vec<_> = comps
+            .iter()
+            .filter(|(id, _)| self.selected.is_empty() || self.selected.contains(id))
+            .filter(|(_, c)| !d.blocks_only || self.catalogue.get(&c.def).is_some_and(|x| x.category == 0))
+            .collect();
+        if targets.is_empty() {
+            self.status = "Nothing to paint".into();
+            return;
+        }
+        let (bottom, top) = targets.iter().map(|(_, c)| c.voxel[1] as f32 * 0.25).fold((f32::MAX, f32::MIN), |a, y| (a.0.min(y), a.1.max(y)));
+        let wl = d.waterline.or(default_waterline).unwrap_or(0.0);
+        let paints: Vec<(CompId, String)> = targets.iter().map(|(id, c)| (*id, paint::hex(paint::livery(&d, c.voxel, wl, bottom, top)))).collect();
+        self.model.paint_each(&paints, true);
+        self.status = format!("Livery applied to {} parts (one undo step)", paints.len());
+    }
+
     fn copy_selection(&mut self) {
         let parts: Vec<_> = self.model.components().into_iter().filter(|(id, _)| self.selected.contains(id)).map(|(_, c)| c).collect();
         let lo = [0, 1, 2].map(|i| parts.iter().map(|c| c.voxel[i]).min().unwrap_or(0));
@@ -453,7 +587,11 @@ impl KeelApp {
                     self.faces_gen = u64::MAX;
                     ui.close();
                 }
-                if ui.button("Open…  (Ctrl+O)").clicked() {
+                if ui.button("Open from Stormworks…").on_hover_text("Your saved vehicles in the game's vehicles folder").clicked() {
+                    self.dialog = Some(Dialog::Library);
+                    ui.close();
+                }
+                if ui.button("Open file…  (Ctrl+O)").clicked() {
                     self.open_dialog();
                     ui.close();
                 }
@@ -481,6 +619,17 @@ impl KeelApp {
                 }
                 if ui.button("Save as / Export vehicle XML…").clicked() {
                     self.save_as_dialog();
+                    ui.close();
+                }
+                if ui.button("Export to Stormworks…  (Ctrl+E)").clicked() {
+                    self.open_export();
+                    ui.close();
+                }
+                if ui.button("Launch Stormworks").clicked() {
+                    self.status = match game::launch() {
+                        Ok(()) => "Starting Stormworks through Steam…".into(),
+                        Err(e) => format!("Could not start Steam: {e}"),
+                    };
                     ui.close();
                 }
                 ui.separator();
@@ -586,7 +735,12 @@ impl KeelApp {
                     ui.painter().circle_filled(d.center(), 3.5, col);
                     ui.label(RichText::new(txt).small().color(col));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label(RichText::new(format!("KEEL {}  ·  Stormworks Engineering Suite", env!("CARGO_PKG_VERSION"))).small().color(theme::TEXT_DIM));
+                        let b = egui::Button::new(RichText::new("Export to Stormworks").color(theme::BG).strong()).fill(theme::CYAN).corner_radius(egui::CornerRadius::same(16)).min_size(egui::vec2(0.0, 30.0));
+                        if ui.add(b).on_hover_text("Save this vehicle straight into the game's vehicles folder, with a thumbnail (Ctrl+E)").clicked() {
+                            self.open_export();
+                        }
+                        ui.add_space(8.0);
+                        ui.label(RichText::new(format!("KEEL {}", env!("CARGO_PKG_VERSION"))).small().color(theme::TEXT_DIM));
                     });
                 });
                 self.menu(ui);
@@ -662,14 +816,50 @@ impl KeelApp {
     }
 
     fn apply_interior(&mut self, g: interior::Generated) {
-        use keel_model::edit::GenLink;
-        let rem = std::mem::take(&mut self.interior.doc.generated);
+        use keel_model::edit::{GenLink, GenPart};
+        let rem_prev = std::mem::take(&mut self.interior.doc.generated);
         let rem_links: Vec<GenLink> = std::mem::take(&mut self.interior.doc.generated_links).into_iter().map(|(kind, a, b)| GenLink { kind, a, b }).collect();
         let b = &g.layout.build;
-        let (r, a, l) = self.model.apply_build_replacing(0, &rem, &rem_links, &b.parts, &b.links);
+        // hull parts in the way of a new shaft or pipe make way; ones displaced earlier come back if no longer needed
+        let clear: HashSet<[i32; 3]> = b.clear.iter().copied().collect();
+        let generated: HashSet<([i32; 3], String)> = rem_prev.iter().map(|(d, v, _)| (*v, d.clone())).collect();
+        let prev_displaced = std::mem::take(&mut self.interior.doc.displaced);
+        let mut displaced: Vec<(String, [i32; 3], [i32; 9], Option<String>)> = prev_displaced.iter().filter(|d| clear.contains(&d.1)).cloned().collect();
+        let mut remove = rem_prev.clone();
+        for (id, c) in self.model.components() {
+            if id.body == 0 && clear.contains(&c.voxel) && !generated.contains(&(c.voxel, c.def.clone())) {
+                remove.push((c.def.clone(), c.voxel, c.rotation));
+                displaced.push((c.def.clone(), c.voxel, c.rotation, c.attrs.get("bc").cloned()));
+            }
+        }
+        let mut parts = b.parts.clone();
+        parts.extend(prev_displaced.iter().filter(|d| !clear.contains(&d.1)).map(|(def, vp, r, bc)| GenPart { def: def.clone(), vp: *vp, r: *r, bc: bc.clone(), ac: None }));
+        let (r, a, l) = self.model.apply_build_replacing(0, &remove, &rem_links, &parts, &b.links);
+        // part settings (fuel type, gear ratios) and microcontroller programs, in the same undo step
+        let comps = self.model.components();
+        let find = |def: &str, vp: [i32; 3]| comps.iter().find(|(id, c)| id.body == 0 && c.voxel == vp && c.def == def).map(|(id, _)| *id);
+        let mut sets = vec![];
+        for e in &b.extras {
+            let Some(id) = find(&e.def, e.vp) else { continue };
+            for (k, v) in &e.attrs {
+                sets.push((id, k.as_str(), v.clone()));
+            }
+            if let Some(xml) = &e.mc {
+                if let Ok(doc) = keel_io::xml::parse(xml) {
+                    self.model.put_mc_definition(id, doc.root, false);
+                }
+            }
+        }
+        self.model.set_attr_each(&sets, false);
         self.interior.doc.generated = b.parts.iter().map(|p| (p.def.clone(), p.vp, p.r)).collect();
         self.interior.doc.generated_links = b.links.iter().map(|l| (l.kind, l.a, l.b)).collect();
-        self.status = format!("Interior generated: {a} parts and {l} wires added, {r} previous parts removed (one undo step); {} lighting circuits", g.layout.circuits.len());
+        self.interior.doc.displaced = displaced;
+        let prop = match &g.layout.propulsion {
+            Some(rep) if rep.warnings.is_empty() => "; propulsion installed".to_string(),
+            Some(rep) => format!("; propulsion installed with {} warning(s) (see Decks)", rep.warnings.len()),
+            None => String::new(),
+        };
+        self.status = format!("Generated: {a} parts and {l} wires added, {r} parts removed (one undo step); {} lighting circuits{prop}", g.layout.circuits.len());
     }
 
     fn left_panel(&mut self, ui: &mut egui::Ui) {
@@ -687,6 +877,55 @@ impl KeelApp {
             }
             ui.label(RichText::new(format!("{} wires in this vehicle", self.model.links().len())).small().color(theme::TEXT_DIM));
             ui.separator();
+        }
+        if self.tool == Tool::Decal {
+            let comps = self.model.components();
+            let n = comps.iter().filter(|(id, c)| self.selected.contains(id) && decal::SIGN_DEFS.contains(&c.def.as_str())).count();
+            let act = self.decal_ui.panel_ui(ui, &mut self.design.doc.decals, n);
+            match act {
+                Some(decal::Action::New) => self.new_decal(),
+                Some(decal::Action::Update(i, new_step)) => {
+                    let e = decal::edits(&self.model, &self.design.doc.decals[i], false);
+                    self.model.set_attr_each(&e, new_step);
+                }
+                Some(decal::Action::Remove(i)) => {
+                    let e = decal::edits(&self.model, &self.design.doc.decals[i], true);
+                    self.model.set_attr_each(&e, true);
+                    self.design.doc.decals.remove(i);
+                    self.decal_ui.current = None;
+                    self.status = "Decal removed; the signs' original pixels are back (one undo step)".into();
+                }
+                Some(decal::Action::Reattach(i)) => {
+                    let sel = self.sel();
+                    let old = decal::edits(&self.model, &self.design.doc.decals[i], true);
+                    let d0 = self.design.doc.decals[i].clone();
+                    match decal::create(&self.model, &sel, &d0.name, d0.png.clone()) {
+                        Ok(mut d) => {
+                            d.offset = d0.offset;
+                            d.scale = d0.scale;
+                            d.rotation = d0.rotation;
+                            d.flip_x = d0.flip_x;
+                            d.flip_y = d0.flip_y;
+                            d.opacity = d0.opacity;
+                            let mut e = old;
+                            e.extend(decal::edits(&self.model, &d, false));
+                            self.model.set_attr_each(&e, true);
+                            self.design.doc.decals[i] = d;
+                        }
+                        Err(m) => self.status = m,
+                    }
+                }
+                None => {}
+            }
+            return;
+        }
+        if self.tool == Tool::Paint {
+            let wl = self.design.hull.as_ref().map(|_| (self.design.doc.hull.draft + self.design.doc.origin[1] as f64 * 0.25) as f32);
+            let n = self.selected.len();
+            if let Some(paint::Action::ApplyLivery) = paint::panel_ui(ui, &mut self.design.doc.paint, &mut self.tools.colour, wl, n) {
+                self.apply_livery(wl);
+            }
+            return;
         }
         if self.tool == Tool::Measure {
             theme::section(ui, "Measure");
@@ -823,6 +1062,11 @@ impl KeelApp {
     }
 
     fn dialogs(&mut self, ctx: &egui::Context) {
+        if let Some(img) = self.pending_thumb.take() {
+            let ci = egui::ColorImage::from_rgba_unmultiplied([img.width() as usize, img.height() as usize], img.as_raw());
+            let tex = ctx.load_texture("export_thumb", ci, egui::TextureOptions::LINEAR);
+            self.export_thumb = Some((img, tex));
+        }
         let Some(d) = self.dialog else { return };
         let mut close = false;
         let title = match d {
@@ -830,8 +1074,157 @@ impl KeelApp {
             Dialog::SaveAs => "Save / export vehicle XML",
             Dialog::Settings => "Settings",
             Dialog::Scale => "Scale parts",
+            Dialog::Welcome => "Welcome to KEEL",
+            Dialog::Export => "Export to Stormworks",
+            Dialog::Library => "Open from Stormworks",
         };
         egui::Window::new(title).collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| match d {
+            Dialog::Welcome => {
+                ui.set_max_width(460.0);
+                ui.label("KEEL reads the parts of your own copy of Stormworks so it can show and check them. It never copies or shares them.");
+                ui.add_space(6.0);
+                ui.label(RichText::new("KEEL could not find Stormworks automatically. Choose the Stormworks folder (the one Steam installed, usually …/steamapps/common/Stormworks).").color(theme::TEXT_DIM));
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    if ui.button("Choose the Stormworks folder…").clicked() {
+                        if let Some(p) = rfd::FileDialog::new().set_title("Choose the Stormworks folder").pick_folder() {
+                            match game::normalise_pick(&p) {
+                                Some(defs) => {
+                                    self.settings.definitions_dir = Some(defs);
+                                    self.settings.save();
+                                    self.load_catalogue();
+                                    close = true;
+                                }
+                                None => self.status = format!("No Stormworks parts found in {}. Pick the folder that contains 'rom'.", p.display()),
+                            }
+                        }
+                    }
+                    if ui.button("Try again").on_hover_text("Search the Steam libraries again").clicked() {
+                        if let Some(g) = game::find_game() {
+                            self.settings.definitions_dir = Some(game::definitions_of(&g));
+                            self.settings.save();
+                            self.load_catalogue();
+                            close = true;
+                        }
+                    }
+                    if ui.button("Later").on_hover_text("Blocks only until the game folder is set (File > Settings)").clicked() {
+                        close = true;
+                    }
+                });
+            }
+            Dialog::Export => {
+                ui.set_max_width(560.0);
+                ui.horizontal_top(|ui| {
+                    if let Some((_, tex)) = &self.export_thumb {
+                        ui.image((tex.id(), egui::vec2(220.0, 220.0)));
+                    }
+                    ui.vertical(|ui| {
+                        ui.label("Vehicle name");
+                        ui.add(egui::TextEdit::singleline(&mut self.export_name).desired_width(260.0));
+                        ui.add_space(6.0);
+                        match &self.settings.vehicles_dir {
+                            Some(d) => {
+                                ui.label(RichText::new(format!("Saves to {}", game::pretty(d))).small().color(theme::TEXT_DIM));
+                                let n = game::safe_name(&self.export_name);
+                                if d.join(format!("{n}.xml")).exists() {
+                                    ui.label(RichText::new(format!("A vehicle called “{n}” exists and will be replaced.")).small().color(theme::ORANGE));
+                                }
+                            }
+                            None => {
+                                ui.label(RichText::new("The game's vehicles folder was not found. Start Stormworks once and save any vehicle, or choose the folder.").small().color(theme::ORANGE));
+                            }
+                        }
+                        if ui.small_button("Choose vehicles folder…").clicked() {
+                            if let Some(p) = rfd::FileDialog::new().set_title("Choose Stormworks' vehicles folder (…/Stormworks/data/vehicles)").pick_folder() {
+                                self.settings.vehicles_dir = Some(p);
+                                self.settings.save();
+                            }
+                        }
+                        ui.add_space(10.0);
+                        ui.horizontal(|ui| {
+                            let ok = self.settings.vehicles_dir.is_some();
+                            let go = |launch: bool, this: &mut Self| {
+                                if let (Some(dir), Some((thumb, _))) = (this.settings.vehicles_dir.clone(), &this.export_thumb) {
+                                    match game::export(&dir, &this.export_name, &this.model.to_xml(), thumb) {
+                                        Ok(p) => {
+                                            this.status = format!("Exported to Stormworks as “{}”. In the game, open the vehicle editor and load it.", game::safe_name(&this.export_name));
+                                            this.settings.push_recent(&p);
+                                            if launch {
+                                                let _ = game::launch();
+                                            }
+                                        }
+                                        Err(e) => this.status = format!("Export failed: {e}"),
+                                    }
+                                }
+                            };
+                            if ui.add_enabled(ok, egui::Button::new(RichText::new("Export").strong())).clicked() {
+                                go(false, self);
+                                close = true;
+                            }
+                            if ui.add_enabled(ok, egui::Button::new("Export and launch Stormworks")).clicked() {
+                                go(true, self);
+                                close = true;
+                            }
+                            if ui.button("Cancel").clicked() {
+                                close = true;
+                            }
+                        });
+                    });
+                });
+            }
+            Dialog::Library => {
+                ui.set_max_width(720.0);
+                let Some(dir) = self.settings.vehicles_dir.clone() else {
+                    ui.label("The game's vehicles folder was not found.");
+                    if ui.button("Choose vehicles folder…").clicked() {
+                        if let Some(p) = rfd::FileDialog::new().pick_folder() {
+                            self.settings.vehicles_dir = Some(p);
+                            self.settings.save();
+                        }
+                    }
+                    if ui.button("Close").clicked() {
+                        close = true;
+                    }
+                    return;
+                };
+                let list = game::list_vehicles(&dir);
+                ui.label(RichText::new(format!("{} saved vehicles in {}", list.len(), game::pretty(&dir))).small().color(theme::TEXT_DIM));
+                let mut pick = None;
+                egui::ScrollArea::vertical().max_height(460.0).show(ui, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        for (name, xml, png) in &list {
+                            let tex = self.library_thumbs.entry(xml.clone()).or_insert_with(|| {
+                                let img = png.as_ref().and_then(|p| image::open(p).ok())?.thumbnail(128, 128).to_rgba8();
+                                let ci = egui::ColorImage::from_rgba_unmultiplied([img.width() as usize, img.height() as usize], img.as_raw());
+                                Some(ctx.load_texture(format!("lib_{}", xml.display()), ci, egui::TextureOptions::LINEAR))
+                            });
+                            let (r, resp) = ui.allocate_exact_size(egui::vec2(132.0, 158.0), egui::Sense::click());
+                            ui.painter().rect_filled(r, 10.0, if resp.hovered() { theme::SURFACE_HI } else { theme::SURFACE });
+                            let ir = egui::Rect::from_min_size(r.min + egui::vec2(6.0, 6.0), egui::vec2(120.0, 120.0));
+                            match tex {
+                                Some(t) => {
+                                    ui.painter().image(t.id(), ir, egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)), Color32::WHITE);
+                                }
+                                None => {
+                                    icons::paint(ui.painter(), egui::Rect::from_center_size(ir.center(), egui::vec2(36.0, 36.0)), icons::Icon::Hull, theme::TEXT_DIM);
+                                }
+                            }
+                            let short: String = if name.chars().count() > 17 { name.chars().take(16).collect::<String>() + "…" } else { name.clone() };
+                            ui.painter().text(egui::pos2(r.center().x, r.bottom() - 8.0), egui::Align2::CENTER_BOTTOM, short, egui::FontId::proportional(12.0), theme::TEXT);
+                            if resp.on_hover_text(name).clicked() {
+                                pick = Some(xml.clone());
+                            }
+                        }
+                    });
+                });
+                if let Some(p) = pick {
+                    self.open(p);
+                    close = true;
+                }
+                if ui.button("Close").clicked() {
+                    close = true;
+                }
+            }
             Dialog::Open | Dialog::SaveAs => {
                 ui.label("Path to a vehicle .xml file:");
                 ui.add(egui::TextEdit::singleline(&mut self.path_input).desired_width(480.0));
@@ -852,7 +1245,19 @@ impl KeelApp {
                 });
             }
             Dialog::Settings => {
-                ui.label("Stormworks definitions folder (rom/data/definitions). KEEL reads it; it is never copied or bundled.");
+                if ui.button("Choose the Stormworks folder…").clicked() {
+                    if let Some(p) = rfd::FileDialog::new().pick_folder() {
+                        if let Some(d) = game::normalise_pick(&p) {
+                            self.defs_input = d.display().to_string();
+                        }
+                    }
+                }
+                if ui.button("Find Stormworks automatically").clicked() {
+                    if let Some(g) = game::find_game() {
+                        self.defs_input = game::definitions_of(&g).display().to_string();
+                    }
+                }
+                ui.label(RichText::new("Stormworks definitions folder (rom/data/definitions). KEEL reads it; it is never copied or bundled.").small().color(theme::TEXT_DIM));
                 ui.add(egui::TextEdit::singleline(&mut self.defs_input).desired_width(480.0));
                 ui.horizontal(|ui| {
                     if ui.button("Apply").clicked() {
@@ -964,9 +1369,57 @@ fn stamp_turn(parts: &[keel_model::edit::GenPart], axis: usize) -> Vec<keel_mode
     out
 }
 
+impl KeelApp {
+    /// Open the export dialog: suggest a name and render the thumbnail.
+    fn open_export(&mut self) {
+        if self.export_name.is_empty() {
+            self.export_name = self
+                .path
+                .as_ref()
+                .map(|p| if p.file_name().is_some_and(|f| f == "vehicle.xml") { p.parent().and_then(|d| d.file_name()).map(|d| d.to_string_lossy().to_string()).unwrap_or_default() } else { p.file_stem().unwrap_or_default().to_string_lossy().to_string() })
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "My KEEL boat".into());
+        }
+        self.refresh();
+        let img = game::thumbnail(&self.faces);
+        self.export_thumb = None;
+        self.pending_thumb = Some(img);
+        if self.settings.vehicles_dir.is_none() {
+            self.settings.vehicles_dir = game::vehicles_dir();
+        }
+        self.dialog = Some(Dialog::Export);
+    }
+
+    /// `KEEL_SHOT=out.png:60` saves a screenshot after 60 frames and quits (layout regression checks).
+    fn debug_shot(&mut self, ctx: &egui::Context) {
+        let Ok(spec) = std::env::var("KEEL_SHOT") else { return };
+        let (path, n) = spec.rsplit_once(':').map(|(p, n)| (p.to_string(), n.parse().unwrap_or(60))).unwrap_or((spec.clone(), 60));
+        self.frames += 1;
+        ctx.request_repaint();
+        if self.frames == n {
+            let c = ctx.clone();
+            ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::ScreenshotCallback::new(move |img| {
+                let [w, h] = img.size;
+                let bytes: Vec<u8> = img.pixels.iter().flat_map(|c| c.to_array()).collect();
+                if let Some(buf) = image::RgbaImage::from_raw(w as u32, h as u32, bytes) {
+                    let _ = buf.save(&path);
+                }
+                c.send_viewport_cmd(egui::ViewportCommand::Close);
+                c.request_repaint();
+            })));
+        }
+    }
+}
+
 impl eframe::App for KeelApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        self.debug_shot(&ctx);
+        if self.livery_on_start && !self.model.components().is_empty() && !self.bake_on_start {
+            self.livery_on_start = false;
+            let wl = self.design.hull.as_ref().map(|_| (self.design.doc.hull.draft + self.design.doc.origin[1] as f64 * 0.25) as f32);
+            self.apply_livery(wl);
+        }
         self.refresh();
         self.shortcuts(&ctx);
         self.refresh();
@@ -991,7 +1444,7 @@ impl eframe::App for KeelApp {
             });
             let mut bake = None;
             let mut generated = None;
-            egui::Panel::left("left").frame(theme::side_frame()).show_separator_line(false).default_size(300.0).show(ui, |ui| theme::card(ui, |ui| match self.mode {
+            egui::Panel::left("left").frame(theme::side_frame()).show_separator_line(false).default_size(300.0).size_range(240.0..=560.0).show(ui, |ui| theme::card(ui, |ui| match self.mode {
                 Mode::Build => self.left_panel(ui),
                 Mode::Hull => {
                     self.design.refresh();
@@ -999,6 +1452,17 @@ impl eframe::App for KeelApp {
                 }
                 Mode::Power => {
                     self.design.refresh();
+                    if std::mem::take(&mut self.power.install_requested) {
+                        self.interior.refresh(self.design.hull.as_ref(), &self.design.doc.hull, self.design.doc.origin);
+                        self.interior.doc.install_propulsion = true;
+                        let (o, sum) = self.power.propulsion();
+                        self.interior.propulsion = Some(o);
+                        self.interior.propulsion_summary = sum;
+                        match self.interior.generate() {
+                            Some(g) => generated = Some(g),
+                            None => self.status = "Design and bake a hull first (Hull mode): the drive goes into its engine room".into(),
+                        }
+                    }
                     let mass: f64 = self.model.components().iter().map(|(_, c)| self.catalogue.get(&c.def).map(|d| d.mass).unwrap_or(0.0)).sum();
                     self.power.refresh(self.design.hull.as_ref(), &self.design.doc.hull, mass);
                     self.power.panel_ui(ui);
@@ -1011,6 +1475,9 @@ impl eframe::App for KeelApp {
                 }
                 Mode::Decks => {
                     self.design.refresh();
+                    let (o, sum) = self.power.propulsion();
+                    self.interior.propulsion = Some(o);
+                    self.interior.propulsion_summary = sum;
                     self.interior.refresh(self.design.hull.as_ref(), &self.design.doc.hull, self.design.doc.origin);
                     if let Some(g) = self.interior.panel_ui(ui) {
                         generated = Some(g);
@@ -1023,7 +1490,7 @@ impl eframe::App for KeelApp {
             if let Some(g) = generated {
                 self.apply_interior(g);
             }
-            egui::Panel::right("right").frame(theme::side_frame()).show_separator_line(false).default_size(310.0).show(ui, |ui| theme::card(ui, |ui| {
+            egui::Panel::right("right").frame(theme::side_frame()).show_separator_line(false).default_size(310.0).size_range(240.0..=560.0).show(ui, |ui| theme::card(ui, |ui| {
                 if self.mode == Mode::Hull {
                     self.design.hydro_ui(ui);
                     ui.separator();
@@ -1085,7 +1552,23 @@ impl eframe::App for KeelApp {
                     ghost = Some(geometry::build_faces(&tmp, &self.catalogue));
                 }
             }
-            let r = viewport::show(ui, &mut self.cam, &self.renderer, ghost.as_deref());
+            let r = viewport::show_with(ui, &mut self.cam, &self.renderer, ghost.as_deref(), self.tool == Tool::Paint);
+            if self.tool == Tool::Paint {
+                if let (Some((_, started)), Some(h)) = (r.tool_drag, &hit) {
+                    if started {
+                        self.stroke.clear();
+                    }
+                    let alt = ui.input(|i| i.modifiers.alt);
+                    if !alt {
+                        let first = self.stroke.is_empty();
+                        self.dab(h.comp, h.point, first);
+                    }
+                }
+                if r.tool_drag_stopped && !self.stroke.is_empty() {
+                    self.status = format!("Painted {} parts (one undo step)", self.stroke.len());
+                    self.stroke.clear();
+                }
+            }
             if !self.clean {
                 theme::round_corners(ui.painter(), rect);
             }
@@ -1103,7 +1586,7 @@ impl eframe::App for KeelApp {
             }
             if let Some((_, mods)) = click {
                 match self.tool {
-                    Tool::Select => match &hit {
+                    Tool::Select | Tool::Decal => match &hit {
                         Some(hit) => {
                             if mods.shift || mods.command {
                                 if !self.selected.remove(&hit.comp) {
@@ -1158,16 +1641,10 @@ impl eframe::App for KeelApp {
                                     self.status = format!("Picked colour {bc}");
                                 }
                             } else {
-                                let mut ids = vec![h.comp];
-                                if self.tools.mirror {
-                                    if let Some((_, c)) = comps.iter().find(|(id, _)| *id == h.comp) {
-                                        let m = [-c.voxel[0], c.voxel[1], c.voxel[2]];
-                                        ids.extend(comps.iter().filter(|(id, o)| id.body == h.comp.body && o.voxel == m && o.def == c.def && *id != h.comp).map(|(id, _)| *id));
-                                    }
-                                }
-                                let hx = tools::hex(self.tools.colour);
-                                self.model.set_paint(&ids, Some(&hx), None);
-                                self.status = format!("Painted {} part(s) {hx}", ids.len());
+                                self.stroke.clear();
+                                self.dab(h.comp, h.point, true);
+                                self.status = format!("Painted {} part(s)", self.stroke.len());
+                                self.stroke.clear();
                             }
                         }
                     }
@@ -1203,10 +1680,13 @@ struct Args {
     bake: bool,
     plan_docked: bool,
     tool: Option<String>,
+    dialog: Option<String>,
+    livery: bool,
+    decal_demo: Option<PathBuf>,
 }
 
 fn parse_args() -> Args {
-    let mut a = Args { vehicle: None, defs: None, rom: None, view: None, clean: false, zoom: 1.0, look: None, mode: None, bake: false, plan_docked: false, tool: None };
+    let mut a = Args { vehicle: None, defs: None, rom: None, view: None, clean: false, zoom: 1.0, look: None, mode: None, bake: false, plan_docked: false, tool: None, dialog: None, livery: false, decal_demo: None };
     let mut it = std::env::args().skip(1);
     while let Some(x) = it.next() {
         if x == "--defs" {
@@ -1215,6 +1695,12 @@ fn parse_args() -> Args {
             a.plan_docked = true;
         } else if x == "--bake-hull" {
             a.bake = true;
+        } else if x == "--decal-demo" {
+            a.decal_demo = it.next().map(PathBuf::from);
+        } else if x == "--livery" {
+            a.livery = true;
+        } else if x == "--dialog" {
+            a.dialog = it.next();
         } else if x == "--tool" {
             a.tool = it.next();
         } else if x == "--mode" {

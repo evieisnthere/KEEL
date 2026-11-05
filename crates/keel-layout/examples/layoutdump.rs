@@ -24,6 +24,7 @@ fn main() {
         plan: Default::default(),
         finish: Default::default(),
         lighting: Default::default(),
+        propulsion: None,
     };
     let l = generate(&hb, &opt);
     eprintln!("{}: {} rooms, unplaced {:?}, {} parts, {} links", boat.name(), l.plan.rooms.len(), l.plan.unplaced, l.build.parts.len(), l.build.links.len());

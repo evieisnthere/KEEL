@@ -509,16 +509,63 @@ impl Model {
 
     /// Replace (or add) a microcontroller component's definition (one undo step).
     pub fn set_mc_definition(&mut self, id: CompId, def: Element) -> bool {
+        self.put_mc_definition(id, def, true)
+    }
+
+    /// As [`Model::set_mc_definition`]; `new_step` false joins the current undo step (part of a larger generation).
+    pub fn put_mc_definition(&mut self, id: CompId, def: Element, new_step: bool) -> bool {
         if self.component_o_mut(id).is_none() {
             return false;
         }
-        self.checkpoint();
+        if new_step {
+            self.checkpoint();
+        } else {
+            self.generation += 1;
+            self.dirty = true;
+        }
         let o = self.component_o_mut(id).unwrap();
         match o.find_mut("microprocessor_definition") {
             Some(e) => *e = def,
             None => o.insert(0, def),
         }
         true
+    }
+
+    /// Paint each component its own colour (block and additive paint). `new_step` starts a new undo step; a brush
+    /// stroke passes true on its first dab and false after, so the whole stroke undoes at once.
+    pub fn paint_each(&mut self, paints: &[(CompId, String)], new_step: bool) {
+        if paints.is_empty() {
+            return;
+        }
+        if new_step {
+            self.checkpoint();
+        }
+        for (id, c) in paints {
+            if let Some(o) = self.component_o_mut(*id) {
+                o.set("bc", c);
+                o.set("ac", c);
+            }
+        }
+        self.generation += 1;
+        self.dirty = true;
+    }
+
+    /// Set one attribute of each listed component's `<o>` (e.g. a paintable sign's `gc` pixels). `new_step` starts
+    /// a new undo step; continuous edits (a slider being dragged) pass false after the first change.
+    pub fn set_attr_each(&mut self, sets: &[(CompId, &str, String)], new_step: bool) {
+        if sets.is_empty() {
+            return;
+        }
+        if new_step {
+            self.checkpoint();
+        }
+        for (id, k, v) in sets {
+            if let Some(o) = self.component_o_mut(*id) {
+                o.set(k, v);
+            }
+        }
+        self.generation += 1;
+        self.dirty = true;
     }
 
     fn component_o_mut(&mut self, id: CompId) -> Option<&mut Element> {
