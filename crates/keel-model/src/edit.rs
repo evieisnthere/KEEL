@@ -509,10 +509,20 @@ impl Model {
 
     /// Replace (or add) a microcontroller component's definition (one undo step).
     pub fn set_mc_definition(&mut self, id: CompId, def: Element) -> bool {
+        self.put_mc_definition(id, def, true)
+    }
+
+    /// As [`Model::set_mc_definition`]; `new_step` false joins the current undo step (part of a larger generation).
+    pub fn put_mc_definition(&mut self, id: CompId, def: Element, new_step: bool) -> bool {
         if self.component_o_mut(id).is_none() {
             return false;
         }
-        self.checkpoint();
+        if new_step {
+            self.checkpoint();
+        } else {
+            self.generation += 1;
+            self.dirty = true;
+        }
         let o = self.component_o_mut(id).unwrap();
         match o.find_mut("microprocessor_definition") {
             Some(e) => *e = def,

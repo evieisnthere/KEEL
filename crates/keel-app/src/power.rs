@@ -50,6 +50,8 @@ pub struct Power {
     result: Option<(Operating, Boat)>,
     found: Vec<Candidate>,
     pub status: String,
+    /// the user asked to install this drive in the boat
+    pub install_requested: bool,
 }
 
 impl Power {
@@ -123,8 +125,36 @@ impl Power {
         self.result = Some((op, boat));
     }
 
+    /// The installer's options for this design, and a one-line summary.
+    pub fn propulsion(&self) -> (keel_layout::propulsion::PropulsionOptions, String) {
+        let d = &self.doc;
+        let o = keel_layout::propulsion::PropulsionOptions {
+            electric: d.electric,
+            cylinders: d.cylinders.clamp(2, 12),
+            motor: d.motor.min(2),
+            gear: d.gear.clamp(0, 7),
+            prop: d.prop.min(2),
+            lines: d.lines.clamp(1, 2),
+            tanks: ((d.fuel / 1500.0).ceil() as usize).clamp(1, 3),
+            batteries: d.batteries.max(1),
+            rudder: true,
+            ..Default::default()
+        };
+        let drive = if d.electric { MOTORS[o.motor].name.to_string() } else { format!("{}-cylinder 1×1 modular engine", o.cylinders) };
+        let mut s = format!("{} line(s): {drive}, gearbox {}, {}", o.lines, GEARS[o.gear].1, PROPS[o.prop].name);
+        if !d.electric && d.cylinder != 0 {
+            s.push_str(". The installer builds 1×1 cylinders; larger cylinder kits are not laid out yet");
+        }
+        (o, s)
+    }
+
     pub fn panel_ui(&mut self, ui: &mut egui::Ui) {
         egui::ScrollArea::vertical().show(ui, |ui| {
+            let b = egui::Button::new(RichText::new("Install in the boat").strong().color(theme::BG)).fill(theme::CYAN);
+            if ui.add(b).on_hover_text("Place this drive in the engine room with fuel, pipes, pumps, shaft, propeller, rudder and controls (with the interior, one undo step)").clicked() {
+                self.install_requested = true;
+            }
+            ui.add_space(4.0);
             theme::section(ui, "Drive");
             ui.horizontal(|ui| {
                 if ui.selectable_label(!self.doc.electric, "Modular engine").clicked() {

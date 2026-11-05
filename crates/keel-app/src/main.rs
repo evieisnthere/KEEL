@@ -816,14 +816,50 @@ impl KeelApp {
     }
 
     fn apply_interior(&mut self, g: interior::Generated) {
-        use keel_model::edit::GenLink;
-        let rem = std::mem::take(&mut self.interior.doc.generated);
+        use keel_model::edit::{GenLink, GenPart};
+        let rem_prev = std::mem::take(&mut self.interior.doc.generated);
         let rem_links: Vec<GenLink> = std::mem::take(&mut self.interior.doc.generated_links).into_iter().map(|(kind, a, b)| GenLink { kind, a, b }).collect();
         let b = &g.layout.build;
-        let (r, a, l) = self.model.apply_build_replacing(0, &rem, &rem_links, &b.parts, &b.links);
+        // hull parts in the way of a new shaft or pipe make way; ones displaced earlier come back if no longer needed
+        let clear: HashSet<[i32; 3]> = b.clear.iter().copied().collect();
+        let generated: HashSet<([i32; 3], String)> = rem_prev.iter().map(|(d, v, _)| (*v, d.clone())).collect();
+        let prev_displaced = std::mem::take(&mut self.interior.doc.displaced);
+        let mut displaced: Vec<(String, [i32; 3], [i32; 9], Option<String>)> = prev_displaced.iter().filter(|d| clear.contains(&d.1)).cloned().collect();
+        let mut remove = rem_prev.clone();
+        for (id, c) in self.model.components() {
+            if id.body == 0 && clear.contains(&c.voxel) && !generated.contains(&(c.voxel, c.def.clone())) {
+                remove.push((c.def.clone(), c.voxel, c.rotation));
+                displaced.push((c.def.clone(), c.voxel, c.rotation, c.attrs.get("bc").cloned()));
+            }
+        }
+        let mut parts = b.parts.clone();
+        parts.extend(prev_displaced.iter().filter(|d| !clear.contains(&d.1)).map(|(def, vp, r, bc)| GenPart { def: def.clone(), vp: *vp, r: *r, bc: bc.clone(), ac: None }));
+        let (r, a, l) = self.model.apply_build_replacing(0, &remove, &rem_links, &parts, &b.links);
+        // part settings (fuel type, gear ratios) and microcontroller programs, in the same undo step
+        let comps = self.model.components();
+        let find = |def: &str, vp: [i32; 3]| comps.iter().find(|(id, c)| id.body == 0 && c.voxel == vp && c.def == def).map(|(id, _)| *id);
+        let mut sets = vec![];
+        for e in &b.extras {
+            let Some(id) = find(&e.def, e.vp) else { continue };
+            for (k, v) in &e.attrs {
+                sets.push((id, k.as_str(), v.clone()));
+            }
+            if let Some(xml) = &e.mc {
+                if let Ok(doc) = keel_io::xml::parse(xml) {
+                    self.model.put_mc_definition(id, doc.root, false);
+                }
+            }
+        }
+        self.model.set_attr_each(&sets, false);
         self.interior.doc.generated = b.parts.iter().map(|p| (p.def.clone(), p.vp, p.r)).collect();
         self.interior.doc.generated_links = b.links.iter().map(|l| (l.kind, l.a, l.b)).collect();
-        self.status = format!("Interior generated: {a} parts and {l} wires added, {r} previous parts removed (one undo step); {} lighting circuits", g.layout.circuits.len());
+        self.interior.doc.displaced = displaced;
+        let prop = match &g.layout.propulsion {
+            Some(rep) if rep.warnings.is_empty() => "; propulsion installed".to_string(),
+            Some(rep) => format!("; propulsion installed with {} warning(s) (see Decks)", rep.warnings.len()),
+            None => String::new(),
+        };
+        self.status = format!("Generated: {a} parts and {l} wires added, {r} parts removed (one undo step); {} lighting circuits{prop}", g.layout.circuits.len());
     }
 
     fn left_panel(&mut self, ui: &mut egui::Ui) {
@@ -1416,6 +1452,17 @@ impl eframe::App for KeelApp {
                 }
                 Mode::Power => {
                     self.design.refresh();
+                    if std::mem::take(&mut self.power.install_requested) {
+                        self.interior.refresh(self.design.hull.as_ref(), &self.design.doc.hull, self.design.doc.origin);
+                        self.interior.doc.install_propulsion = true;
+                        let (o, sum) = self.power.propulsion();
+                        self.interior.propulsion = Some(o);
+                        self.interior.propulsion_summary = sum;
+                        match self.interior.generate() {
+                            Some(g) => generated = Some(g),
+                            None => self.status = "Design and bake a hull first (Hull mode): the drive goes into its engine room".into(),
+                        }
+                    }
                     let mass: f64 = self.model.components().iter().map(|(_, c)| self.catalogue.get(&c.def).map(|d| d.mass).unwrap_or(0.0)).sum();
                     self.power.refresh(self.design.hull.as_ref(), &self.design.doc.hull, mass);
                     self.power.panel_ui(ui);
@@ -1428,6 +1475,9 @@ impl eframe::App for KeelApp {
                 }
                 Mode::Decks => {
                     self.design.refresh();
+                    let (o, sum) = self.power.propulsion();
+                    self.interior.propulsion = Some(o);
+                    self.interior.propulsion_summary = sum;
                     self.interior.refresh(self.design.hull.as_ref(), &self.design.doc.hull, self.design.doc.origin);
                     if let Some(g) = self.interior.panel_ui(ui) {
                         generated = Some(g);

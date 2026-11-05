@@ -40,6 +40,11 @@ Barges A–F (draft, sealing, door frames), round-trip R1/R2. Still to add to th
 **L1** (logic tick counting), **E1** (battery drain with a motor at fixed throttle), **S1** (straight-line top speed of
 3556526754 at full throttle).
 
+**C2 (propulsion installer check):** generate a workboat in Decks mode with "Install the drive from Power mode" ticked,
+export it, and in game: turn the key (starter should run until the engine turns), raise the throttle lever (clutch
+engages, boat moves), steer with A/D. Report anything that does not connect (fuel, air, exhaust, cooling, shaft). The
+engine layout follows working corpus engines but has not been run in game.
+
 **C1 (propulsion calibration, requested 2026-11-04):** the KEEL "Planing" preset hull baked and saved from KEEL, plus
 one large electric motor driving one small propeller directly, a small battery and a throttle lever at 100 %. Report
 the steady top speed and the mass the editor shows. KEEL then sets the thrust factor (`keel_power::solve::calibrate`).

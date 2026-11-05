@@ -5,6 +5,20 @@ use keel_model::edit::{GenLink, GenPart};
 pub struct Build {
     pub parts: Vec<GenPart>,
     pub links: Vec<GenLink>,
+    /// extra settings for generated parts (applied after the parts are added)
+    pub extras: Vec<PartExtra>,
+    /// voxels where existing (non-generated) parts must make way, e.g. hull blocks a shaft passes through
+    pub clear: Vec<[i32; 3]>,
+}
+
+/// Attributes and child XML for a generated part, found again by definition and voxel.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PartExtra {
+    pub def: String,
+    pub vp: [i32; 3],
+    pub attrs: Vec<(String, String)>,
+    /// a microcontroller's `microprocessor_definition` element, as XML
+    pub mc: Option<String>,
 }
 
 /// Axis directions: 0 +x, 1 −x, 2 +y, 3 −y, 4 +z, 5 −z (the game's face order).
@@ -45,6 +59,8 @@ impl Build {
         self.links.push(GenLink { kind, a, b });
     }
     pub fn extend(&mut self, o: Build) {
+        self.extras.extend(o.extras);
+        self.clear.extend(o.clear);
         self.parts.extend(o.parts);
         self.links.extend(o.links);
     }
