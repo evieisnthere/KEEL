@@ -540,6 +540,24 @@ impl Model {
         self.dirty = true;
     }
 
+    /// Set one attribute of each listed component's `<o>` (e.g. a paintable sign's `gc` pixels). `new_step` starts
+    /// a new undo step; continuous edits (a slider being dragged) pass false after the first change.
+    pub fn set_attr_each(&mut self, sets: &[(CompId, &str, String)], new_step: bool) {
+        if sets.is_empty() {
+            return;
+        }
+        if new_step {
+            self.checkpoint();
+        }
+        for (id, k, v) in sets {
+            if let Some(o) = self.component_o_mut(*id) {
+                o.set(k, v);
+            }
+        }
+        self.generation += 1;
+        self.dirty = true;
+    }
+
     fn component_o_mut(&mut self, id: CompId) -> Option<&mut Element> {
         let cs = self.components_el_mut(id.body)?;
         cs.elements_mut().filter(|e| e.tag == "c").nth(id.comp)?.find_mut("o")

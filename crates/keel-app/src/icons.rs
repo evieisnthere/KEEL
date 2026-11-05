@@ -18,6 +18,7 @@ pub enum Icon {
     Chip,
     Trash,
     Hull,
+    Image,
     Decks,
     Power,
 }
@@ -109,6 +110,11 @@ pub fn paint(p: &egui::Painter, rect: Rect, icon: Icon, c: Color32) {
                 line(&[(1.5, v), (4.0, v)]);
                 line(&[(12.0, v), (14.5, v)]);
             }
+        }
+        Icon::Image => {
+            closed(&[(2.0, 3.0), (14.0, 3.0), (14.0, 13.0), (2.0, 13.0)]);
+            line(&[(2.5, 12.0), (6.5, 7.5), (9.5, 10.5), (11.0, 9.0), (13.5, 12.0)]);
+            p.circle_filled(at(10.8, 6.0), 1.4 * s / 16.0, c);
         }
         Icon::Hull => {
             // side profile: sheer, raked bow, flat transom

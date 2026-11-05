@@ -11,16 +11,18 @@ pub enum Tool {
     Fill,
     Measure,
     Wire,
+    Decal,
 }
 
 impl Tool {
-    pub const ALL: [(Tool, Icon, &'static str, &'static str); 6] = [
+    pub const ALL: [(Tool, Icon, &'static str, &'static str); 7] = [
         (Tool::Select, Icon::Select, "Select", "Click to select, Shift/Ctrl to add (Esc)"),
         (Tool::Place, Icon::Place, "Place", "Place the palette part; R / Shift+R / Alt+R rotate it first"),
         (Tool::Paint, Icon::Paint, "Paint", "Click a part to paint it; Alt+click picks its colour"),
         (Tool::Fill, Icon::Fill, "Fill", "Click two corners to fill a box with the palette part"),
         (Tool::Measure, Icon::Measure, "Measure", "Click two points to measure"),
         (Tool::Wire, Icon::Wire, "Wire", "Click an output then an input to wire them; click a wire and press Delete to remove it"),
+        (Tool::Decal, Icon::Image, "Decal", "Put images on paintable signs; select the signs, then add an image"),
     ];
 }
 

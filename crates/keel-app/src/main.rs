@@ -2,6 +2,7 @@
 //! KEEL desktop application.
 //!
 //! Usage: `keel [vehicle.xml] [--defs <rom/data/definitions>]`. The definitions folder is remembered in the settings file.
+mod decal;
 mod design;
 mod game;
 mod icons;
@@ -81,6 +82,7 @@ struct KeelApp {
     /// parts already painted in the current brush stroke
     stroke: HashSet<CompId>,
     livery_on_start: bool,
+    decal_ui: decal::DecalUi,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -141,6 +143,7 @@ impl KeelApp {
             pending_thumb: None,
             stroke: HashSet::new(),
             livery_on_start: args.livery,
+            decal_ui: Default::default(),
             settings,
         };
         if let Some(t) = &args.tool {
@@ -170,6 +173,16 @@ impl KeelApp {
         app.load_catalogue();
         if let Some(p) = args.vehicle {
             app.open(p);
+        }
+        if let Some(img) = &args.decal_demo {
+            // screenshot check: an 8×4 panel of paintable signs with the image on it
+            let parts: Vec<keel_model::edit::GenPart> = (0..8).flat_map(|x| (0..4).map(move |z| keel_model::edit::GenPart { def: "sign_na".into(), vp: [x - 4, 0, z], r: keel_io::vehicle::IDENTITY, bc: Some("FFFFFF".into()), ac: None })).collect();
+            app.model.apply_build(0, &[], &parts, &[]);
+            app.selected = app.model.components().into_iter().map(|(id, _)| id).collect();
+            if let Ok((png, _)) = decal::load_image(img) {
+                app.add_decal("demo", png);
+            }
+            app.tool = Tool::Decal;
         }
         match args.dialog.as_deref() {
             Some("export") => app.open_export(),
@@ -482,6 +495,32 @@ impl KeelApp {
             .map(|(id, v)| (id, paint::hex(paint::vary(self.tools.colour, d.variation, d.jitter, d.seed, v))))
             .collect();
         self.model.paint_each(&paints, new_step);
+    }
+
+    /// Pick an image and put it on the selected signs (one undo step).
+    fn new_decal(&mut self) {
+        let Some(p) = rfd::FileDialog::new().set_title("Choose an image for the decal").add_filter("Images", &["png", "jpg", "jpeg"]).pick_file() else { return };
+        match decal::load_image(&p) {
+            Ok((png, _)) => {
+                let name = p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+                self.add_decal(&name, png);
+            }
+            Err(e) => self.status = format!("Could not read the image: {e}"),
+        }
+    }
+
+    fn add_decal(&mut self, name: &str, png: String) {
+        let sel = self.sel();
+        match decal::create(&self.model, &sel, name, png) {
+            Ok(d) => {
+                let e = decal::edits(&self.model, &d, false);
+                self.model.set_attr_each(&e, true);
+                self.design.doc.decals.push(d);
+                self.decal_ui.current = Some(self.design.doc.decals.len() - 1);
+                self.status = format!("Decal added on {} sign(s). Adjust it on the left at any time.", e.len());
+            }
+            Err(m) => self.status = m,
+        }
     }
 
     /// Apply the livery to the selection (or the whole vehicle) as one undo step.
@@ -802,6 +841,47 @@ impl KeelApp {
             }
             ui.label(RichText::new(format!("{} wires in this vehicle", self.model.links().len())).small().color(theme::TEXT_DIM));
             ui.separator();
+        }
+        if self.tool == Tool::Decal {
+            let comps = self.model.components();
+            let n = comps.iter().filter(|(id, c)| self.selected.contains(id) && decal::SIGN_DEFS.contains(&c.def.as_str())).count();
+            let act = self.decal_ui.panel_ui(ui, &mut self.design.doc.decals, n);
+            match act {
+                Some(decal::Action::New) => self.new_decal(),
+                Some(decal::Action::Update(i, new_step)) => {
+                    let e = decal::edits(&self.model, &self.design.doc.decals[i], false);
+                    self.model.set_attr_each(&e, new_step);
+                }
+                Some(decal::Action::Remove(i)) => {
+                    let e = decal::edits(&self.model, &self.design.doc.decals[i], true);
+                    self.model.set_attr_each(&e, true);
+                    self.design.doc.decals.remove(i);
+                    self.decal_ui.current = None;
+                    self.status = "Decal removed; the signs' original pixels are back (one undo step)".into();
+                }
+                Some(decal::Action::Reattach(i)) => {
+                    let sel = self.sel();
+                    let old = decal::edits(&self.model, &self.design.doc.decals[i], true);
+                    let d0 = self.design.doc.decals[i].clone();
+                    match decal::create(&self.model, &sel, &d0.name, d0.png.clone()) {
+                        Ok(mut d) => {
+                            d.offset = d0.offset;
+                            d.scale = d0.scale;
+                            d.rotation = d0.rotation;
+                            d.flip_x = d0.flip_x;
+                            d.flip_y = d0.flip_y;
+                            d.opacity = d0.opacity;
+                            let mut e = old;
+                            e.extend(decal::edits(&self.model, &d, false));
+                            self.model.set_attr_each(&e, true);
+                            self.design.doc.decals[i] = d;
+                        }
+                        Err(m) => self.status = m,
+                    }
+                }
+                None => {}
+            }
+            return;
         }
         if self.tool == Tool::Paint {
             let wl = self.design.hull.as_ref().map(|_| (self.design.doc.hull.draft + self.design.doc.origin[1] as f64 * 0.25) as f32);
@@ -1456,7 +1536,7 @@ impl eframe::App for KeelApp {
             }
             if let Some((_, mods)) = click {
                 match self.tool {
-                    Tool::Select => match &hit {
+                    Tool::Select | Tool::Decal => match &hit {
                         Some(hit) => {
                             if mods.shift || mods.command {
                                 if !self.selected.remove(&hit.comp) {
@@ -1552,10 +1632,11 @@ struct Args {
     tool: Option<String>,
     dialog: Option<String>,
     livery: bool,
+    decal_demo: Option<PathBuf>,
 }
 
 fn parse_args() -> Args {
-    let mut a = Args { vehicle: None, defs: None, rom: None, view: None, clean: false, zoom: 1.0, look: None, mode: None, bake: false, plan_docked: false, tool: None, dialog: None, livery: false };
+    let mut a = Args { vehicle: None, defs: None, rom: None, view: None, clean: false, zoom: 1.0, look: None, mode: None, bake: false, plan_docked: false, tool: None, dialog: None, livery: false, decal_demo: None };
     let mut it = std::env::args().skip(1);
     while let Some(x) = it.next() {
         if x == "--defs" {
@@ -1564,6 +1645,8 @@ fn parse_args() -> Args {
             a.plan_docked = true;
         } else if x == "--bake-hull" {
             a.bake = true;
+        } else if x == "--decal-demo" {
+            a.decal_demo = it.next().map(PathBuf::from);
         } else if x == "--livery" {
             a.livery = true;
         } else if x == "--dialog" {
