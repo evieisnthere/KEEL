@@ -3,6 +3,7 @@
 //!
 //! Usage: `keel [vehicle.xml] [--defs <rom/data/definitions>]`. The definitions folder is remembered in the settings file.
 mod design;
+mod game;
 mod icons;
 mod interior;
 mod mc;
@@ -70,6 +71,12 @@ struct KeelApp {
     bake_on_start: bool,
     /// frames drawn (for KEEL_SHOT=path:frames, a screenshot after N frames)
     frames: u64,
+    export_name: String,
+    /// thumbnail preview for the export dialog (rendered when the dialog opens)
+    export_thumb: Option<(image::RgbaImage, egui::TextureHandle)>,
+    /// textures of saved-vehicle thumbnails in the library dialog
+    library_thumbs: std::collections::HashMap<PathBuf, Option<egui::TextureHandle>>,
+    pending_thumb: Option<image::RgbaImage>,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -78,6 +85,9 @@ enum Dialog {
     SaveAs,
     Settings,
     Scale,
+    Welcome,
+    Export,
+    Library,
 }
 
 impl KeelApp {
@@ -121,6 +131,10 @@ impl KeelApp {
             frame_next_hull: true,
             bake_on_start: args.bake,
             frames: 0,
+            export_name: String::new(),
+            export_thumb: None,
+            library_thumbs: Default::default(),
+            pending_thumb: None,
             settings,
         };
         if let Some(t) = &args.tool {
@@ -133,9 +147,29 @@ impl KeelApp {
             app.cam.yaw = y;
             app.cam.pitch = p;
         }
+        // first run: find the game through Steam, otherwise ask with a folder picker (no paths to type)
+        if app.settings.definitions_dir.as_ref().is_none_or(|d| !d.is_dir()) {
+            match game::find_game() {
+                Some(g) => {
+                    app.settings.definitions_dir = Some(game::definitions_of(&g));
+                    app.settings.save();
+                }
+                None => app.dialog = Some(Dialog::Welcome),
+            }
+        }
+        if app.settings.vehicles_dir.as_ref().is_none_or(|d| !d.is_dir()) {
+            app.settings.vehicles_dir = game::vehicles_dir();
+            app.settings.save();
+        }
         app.load_catalogue();
         if let Some(p) = args.vehicle {
             app.open(p);
+        }
+        match args.dialog.as_deref() {
+            Some("export") => app.open_export(),
+            Some("library") => app.dialog = Some(Dialog::Library),
+            Some("welcome") => app.dialog = Some(Dialog::Welcome),
+            _ => {}
         }
         app
     }
@@ -290,6 +324,9 @@ impl KeelApp {
             return;
         }
         let ids = self.sel();
+        if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::E)) {
+            self.open_export();
+        }
         let (copy, paste, mirror) = ctx.input(|i| (i.modifiers.command && i.key_pressed(egui::Key::C), i.modifiers.command && i.key_pressed(egui::Key::V), !i.modifiers.command && i.key_pressed(egui::Key::M)));
         if copy && !ids.is_empty() {
             self.copy_selection();
@@ -456,7 +493,11 @@ impl KeelApp {
                     self.faces_gen = u64::MAX;
                     ui.close();
                 }
-                if ui.button("Open…  (Ctrl+O)").clicked() {
+                if ui.button("Open from Stormworks…").on_hover_text("Your saved vehicles in the game's vehicles folder").clicked() {
+                    self.dialog = Some(Dialog::Library);
+                    ui.close();
+                }
+                if ui.button("Open file…  (Ctrl+O)").clicked() {
                     self.open_dialog();
                     ui.close();
                 }
@@ -484,6 +525,17 @@ impl KeelApp {
                 }
                 if ui.button("Save as / Export vehicle XML…").clicked() {
                     self.save_as_dialog();
+                    ui.close();
+                }
+                if ui.button("Export to Stormworks…  (Ctrl+E)").clicked() {
+                    self.open_export();
+                    ui.close();
+                }
+                if ui.button("Launch Stormworks").clicked() {
+                    self.status = match game::launch() {
+                        Ok(()) => "Starting Stormworks through Steam…".into(),
+                        Err(e) => format!("Could not start Steam: {e}"),
+                    };
                     ui.close();
                 }
                 ui.separator();
@@ -589,7 +641,12 @@ impl KeelApp {
                     ui.painter().circle_filled(d.center(), 3.5, col);
                     ui.label(RichText::new(txt).small().color(col));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label(RichText::new(format!("KEEL {}  ·  Stormworks Engineering Suite", env!("CARGO_PKG_VERSION"))).small().color(theme::TEXT_DIM));
+                        let b = egui::Button::new(RichText::new("Export to Stormworks").color(theme::BG).strong()).fill(theme::CYAN).corner_radius(egui::CornerRadius::same(16)).min_size(egui::vec2(0.0, 30.0));
+                        if ui.add(b).on_hover_text("Save this vehicle straight into the game's vehicles folder, with a thumbnail (Ctrl+E)").clicked() {
+                            self.open_export();
+                        }
+                        ui.add_space(8.0);
+                        ui.label(RichText::new(format!("KEEL {}", env!("CARGO_PKG_VERSION"))).small().color(theme::TEXT_DIM));
                     });
                 });
                 self.menu(ui);
@@ -826,6 +883,11 @@ impl KeelApp {
     }
 
     fn dialogs(&mut self, ctx: &egui::Context) {
+        if let Some(img) = self.pending_thumb.take() {
+            let ci = egui::ColorImage::from_rgba_unmultiplied([img.width() as usize, img.height() as usize], img.as_raw());
+            let tex = ctx.load_texture("export_thumb", ci, egui::TextureOptions::LINEAR);
+            self.export_thumb = Some((img, tex));
+        }
         let Some(d) = self.dialog else { return };
         let mut close = false;
         let title = match d {
@@ -833,8 +895,157 @@ impl KeelApp {
             Dialog::SaveAs => "Save / export vehicle XML",
             Dialog::Settings => "Settings",
             Dialog::Scale => "Scale parts",
+            Dialog::Welcome => "Welcome to KEEL",
+            Dialog::Export => "Export to Stormworks",
+            Dialog::Library => "Open from Stormworks",
         };
         egui::Window::new(title).collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| match d {
+            Dialog::Welcome => {
+                ui.set_max_width(460.0);
+                ui.label("KEEL reads the parts of your own copy of Stormworks so it can show and check them. It never copies or shares them.");
+                ui.add_space(6.0);
+                ui.label(RichText::new("KEEL could not find Stormworks automatically. Choose the Stormworks folder (the one Steam installed, usually …/steamapps/common/Stormworks).").color(theme::TEXT_DIM));
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    if ui.button("Choose the Stormworks folder…").clicked() {
+                        if let Some(p) = rfd::FileDialog::new().set_title("Choose the Stormworks folder").pick_folder() {
+                            match game::normalise_pick(&p) {
+                                Some(defs) => {
+                                    self.settings.definitions_dir = Some(defs);
+                                    self.settings.save();
+                                    self.load_catalogue();
+                                    close = true;
+                                }
+                                None => self.status = format!("No Stormworks parts found in {}. Pick the folder that contains 'rom'.", p.display()),
+                            }
+                        }
+                    }
+                    if ui.button("Try again").on_hover_text("Search the Steam libraries again").clicked() {
+                        if let Some(g) = game::find_game() {
+                            self.settings.definitions_dir = Some(game::definitions_of(&g));
+                            self.settings.save();
+                            self.load_catalogue();
+                            close = true;
+                        }
+                    }
+                    if ui.button("Later").on_hover_text("Blocks only until the game folder is set (File > Settings)").clicked() {
+                        close = true;
+                    }
+                });
+            }
+            Dialog::Export => {
+                ui.set_max_width(560.0);
+                ui.horizontal_top(|ui| {
+                    if let Some((_, tex)) = &self.export_thumb {
+                        ui.image((tex.id(), egui::vec2(220.0, 220.0)));
+                    }
+                    ui.vertical(|ui| {
+                        ui.label("Vehicle name");
+                        ui.add(egui::TextEdit::singleline(&mut self.export_name).desired_width(260.0));
+                        ui.add_space(6.0);
+                        match &self.settings.vehicles_dir {
+                            Some(d) => {
+                                ui.label(RichText::new(format!("Saves to {}", game::pretty(d))).small().color(theme::TEXT_DIM));
+                                let n = game::safe_name(&self.export_name);
+                                if d.join(format!("{n}.xml")).exists() {
+                                    ui.label(RichText::new(format!("A vehicle called “{n}” exists and will be replaced.")).small().color(theme::ORANGE));
+                                }
+                            }
+                            None => {
+                                ui.label(RichText::new("The game's vehicles folder was not found. Start Stormworks once and save any vehicle, or choose the folder.").small().color(theme::ORANGE));
+                            }
+                        }
+                        if ui.small_button("Choose vehicles folder…").clicked() {
+                            if let Some(p) = rfd::FileDialog::new().set_title("Choose Stormworks' vehicles folder (…/Stormworks/data/vehicles)").pick_folder() {
+                                self.settings.vehicles_dir = Some(p);
+                                self.settings.save();
+                            }
+                        }
+                        ui.add_space(10.0);
+                        ui.horizontal(|ui| {
+                            let ok = self.settings.vehicles_dir.is_some();
+                            let go = |launch: bool, this: &mut Self| {
+                                if let (Some(dir), Some((thumb, _))) = (this.settings.vehicles_dir.clone(), &this.export_thumb) {
+                                    match game::export(&dir, &this.export_name, &this.model.to_xml(), thumb) {
+                                        Ok(p) => {
+                                            this.status = format!("Exported to Stormworks as “{}”. In the game, open the vehicle editor and load it.", game::safe_name(&this.export_name));
+                                            this.settings.push_recent(&p);
+                                            if launch {
+                                                let _ = game::launch();
+                                            }
+                                        }
+                                        Err(e) => this.status = format!("Export failed: {e}"),
+                                    }
+                                }
+                            };
+                            if ui.add_enabled(ok, egui::Button::new(RichText::new("Export").strong())).clicked() {
+                                go(false, self);
+                                close = true;
+                            }
+                            if ui.add_enabled(ok, egui::Button::new("Export and launch Stormworks")).clicked() {
+                                go(true, self);
+                                close = true;
+                            }
+                            if ui.button("Cancel").clicked() {
+                                close = true;
+                            }
+                        });
+                    });
+                });
+            }
+            Dialog::Library => {
+                ui.set_max_width(720.0);
+                let Some(dir) = self.settings.vehicles_dir.clone() else {
+                    ui.label("The game's vehicles folder was not found.");
+                    if ui.button("Choose vehicles folder…").clicked() {
+                        if let Some(p) = rfd::FileDialog::new().pick_folder() {
+                            self.settings.vehicles_dir = Some(p);
+                            self.settings.save();
+                        }
+                    }
+                    if ui.button("Close").clicked() {
+                        close = true;
+                    }
+                    return;
+                };
+                let list = game::list_vehicles(&dir);
+                ui.label(RichText::new(format!("{} saved vehicles in {}", list.len(), game::pretty(&dir))).small().color(theme::TEXT_DIM));
+                let mut pick = None;
+                egui::ScrollArea::vertical().max_height(460.0).show(ui, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        for (name, xml, png) in &list {
+                            let tex = self.library_thumbs.entry(xml.clone()).or_insert_with(|| {
+                                let img = png.as_ref().and_then(|p| image::open(p).ok())?.thumbnail(128, 128).to_rgba8();
+                                let ci = egui::ColorImage::from_rgba_unmultiplied([img.width() as usize, img.height() as usize], img.as_raw());
+                                Some(ctx.load_texture(format!("lib_{}", xml.display()), ci, egui::TextureOptions::LINEAR))
+                            });
+                            let (r, resp) = ui.allocate_exact_size(egui::vec2(132.0, 158.0), egui::Sense::click());
+                            ui.painter().rect_filled(r, 10.0, if resp.hovered() { theme::SURFACE_HI } else { theme::SURFACE });
+                            let ir = egui::Rect::from_min_size(r.min + egui::vec2(6.0, 6.0), egui::vec2(120.0, 120.0));
+                            match tex {
+                                Some(t) => {
+                                    ui.painter().image(t.id(), ir, egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)), Color32::WHITE);
+                                }
+                                None => {
+                                    icons::paint(ui.painter(), egui::Rect::from_center_size(ir.center(), egui::vec2(36.0, 36.0)), icons::Icon::Hull, theme::TEXT_DIM);
+                                }
+                            }
+                            let short: String = if name.chars().count() > 17 { name.chars().take(16).collect::<String>() + "…" } else { name.clone() };
+                            ui.painter().text(egui::pos2(r.center().x, r.bottom() - 8.0), egui::Align2::CENTER_BOTTOM, short, egui::FontId::proportional(12.0), theme::TEXT);
+                            if resp.on_hover_text(name).clicked() {
+                                pick = Some(xml.clone());
+                            }
+                        }
+                    });
+                });
+                if let Some(p) = pick {
+                    self.open(p);
+                    close = true;
+                }
+                if ui.button("Close").clicked() {
+                    close = true;
+                }
+            }
             Dialog::Open | Dialog::SaveAs => {
                 ui.label("Path to a vehicle .xml file:");
                 ui.add(egui::TextEdit::singleline(&mut self.path_input).desired_width(480.0));
@@ -855,7 +1066,19 @@ impl KeelApp {
                 });
             }
             Dialog::Settings => {
-                ui.label("Stormworks definitions folder (rom/data/definitions). KEEL reads it; it is never copied or bundled.");
+                if ui.button("Choose the Stormworks folder…").clicked() {
+                    if let Some(p) = rfd::FileDialog::new().pick_folder() {
+                        if let Some(d) = game::normalise_pick(&p) {
+                            self.defs_input = d.display().to_string();
+                        }
+                    }
+                }
+                if ui.button("Find Stormworks automatically").clicked() {
+                    if let Some(g) = game::find_game() {
+                        self.defs_input = game::definitions_of(&g).display().to_string();
+                    }
+                }
+                ui.label(RichText::new("Stormworks definitions folder (rom/data/definitions). KEEL reads it; it is never copied or bundled.").small().color(theme::TEXT_DIM));
                 ui.add(egui::TextEdit::singleline(&mut self.defs_input).desired_width(480.0));
                 ui.horizontal(|ui| {
                     if ui.button("Apply").clicked() {
@@ -968,6 +1191,26 @@ fn stamp_turn(parts: &[keel_model::edit::GenPart], axis: usize) -> Vec<keel_mode
 }
 
 impl KeelApp {
+    /// Open the export dialog: suggest a name and render the thumbnail.
+    fn open_export(&mut self) {
+        if self.export_name.is_empty() {
+            self.export_name = self
+                .path
+                .as_ref()
+                .map(|p| if p.file_name().is_some_and(|f| f == "vehicle.xml") { p.parent().and_then(|d| d.file_name()).map(|d| d.to_string_lossy().to_string()).unwrap_or_default() } else { p.file_stem().unwrap_or_default().to_string_lossy().to_string() })
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "My KEEL boat".into());
+        }
+        self.refresh();
+        let img = game::thumbnail(&self.faces);
+        self.export_thumb = None;
+        self.pending_thumb = Some(img);
+        if self.settings.vehicles_dir.is_none() {
+            self.settings.vehicles_dir = game::vehicles_dir();
+        }
+        self.dialog = Some(Dialog::Export);
+    }
+
     /// `KEEL_SHOT=out.png:60` saves a screenshot after 60 frames and quits (layout regression checks).
     fn debug_shot(&mut self, ctx: &egui::Context) {
         let Ok(spec) = std::env::var("KEEL_SHOT") else { return };
@@ -1229,10 +1472,11 @@ struct Args {
     bake: bool,
     plan_docked: bool,
     tool: Option<String>,
+    dialog: Option<String>,
 }
 
 fn parse_args() -> Args {
-    let mut a = Args { vehicle: None, defs: None, rom: None, view: None, clean: false, zoom: 1.0, look: None, mode: None, bake: false, plan_docked: false, tool: None };
+    let mut a = Args { vehicle: None, defs: None, rom: None, view: None, clean: false, zoom: 1.0, look: None, mode: None, bake: false, plan_docked: false, tool: None, dialog: None };
     let mut it = std::env::args().skip(1);
     while let Some(x) = it.next() {
         if x == "--defs" {
@@ -1241,6 +1485,8 @@ fn parse_args() -> Args {
             a.plan_docked = true;
         } else if x == "--bake-hull" {
             a.bake = true;
+        } else if x == "--dialog" {
+            a.dialog = it.next();
         } else if x == "--tool" {
             a.tool = it.next();
         } else if x == "--mode" {

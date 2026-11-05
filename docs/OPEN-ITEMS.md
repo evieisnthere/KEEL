@@ -31,6 +31,7 @@ is closed, delete it here and update the RE document.
 |---|---|---|---|
 | B1 | Vehicle `t` attribute, `sc` format, multi-body joint fields, and many `<o>` properties are unmapped. Round-trip is byte-exact, but authoring new parts needs them | RE-0002 | RE + corpus survey |
 | B2 | A KEEL-exported vehicle has never been loaded in game (round-trip R1/R2 in the test pack) | STATUS row 9 | GAME |
+| B4 | Export writes `<name>.xml` and a 512×512 `<name>.png` into the game's vehicles folder (`%APPDATA%\Stormworks\data\vehicles`, or the Proton prefix on Linux). That the game lists the PNG as the vehicle's thumbnail is unconfirmed | `keel-app/src/game.rs` | GAME |
 | B3 | Unconfirmed conventions: rotation matrix convention (column-major) and the voxel-face flooding mask meaning | RE-0002 | GAME |
 
 ## C. In-game calibration the user has been sent (`keel_test_pack.zip`)

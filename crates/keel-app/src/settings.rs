@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 pub struct Settings {
     pub definitions_dir: Option<PathBuf>,
     pub recent: Vec<PathBuf>,
+    /// the game's saved-vehicles folder (detected or chosen)
+    pub vehicles_dir: Option<PathBuf>,
 }
 
 fn file() -> Option<PathBuf> {
@@ -24,6 +26,7 @@ impl Settings {
         };
         Settings {
             definitions_dir: v["definitions_dir"].as_str().map(PathBuf::from),
+            vehicles_dir: v["vehicles_dir"].as_str().map(PathBuf::from),
             recent: v["recent"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(PathBuf::from)).collect()).unwrap_or_default(),
         }
     }
@@ -32,6 +35,7 @@ impl Settings {
         let _ = std::fs::create_dir_all(f.parent().unwrap());
         let v = json!({
             "definitions_dir": self.definitions_dir.as_ref().map(|p| p.display().to_string()),
+            "vehicles_dir": self.vehicles_dir.as_ref().map(|p| p.display().to_string()),
             "recent": self.recent.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
         });
         let _ = std::fs::write(f, serde_json::to_string_pretty(&v).unwrap());
